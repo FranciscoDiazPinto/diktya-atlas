@@ -1,0 +1,215 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  TECNICO
+  VISUALIZADOR
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         Role
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions       Session[]
+  ticketsAssigned Ticket[]        @relation("TicketAssignee")
+  vlanReservations VlanReservation[]
+  auditLogs      AuditLog[]
+
+  @@map("users")
+}
+
+// Sesiones de refresh token. La emisión/rotación real de JWT la implementa
+// el prompt de seguridad; este modelo ya deja el contrato de datos listo.
+model Session {
+  id                String   @id @default(cuid())
+  userId            String
+  refreshTokenHash  String   @unique
+  userAgent         String?
+  ipAddress         String?
+  revokedAt         DateTime?
+  expiresAt         DateTime
+  createdAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+enum NodeStatus {
+  ONLINE
+  OFFLINE
+  ADOPTING
+  UNKNOWN
+}
+
+model NetworkNode {
+  id                 String     @id @default(cuid())
+  externalId         String     @unique // id crudo del proveedor (UniFi/OPNsense)
+  sitio              String
+  nombre             String
+  modelo             String?
+  status             NodeStatus @default(UNKNOWN)
+  senalDbm           Int?
+  clientesConectados Int        @default(0)
+  uptimeSegundos     Int?
+  ultimaVezVisto     DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  wifiNetworks WifiNetwork[]
+  alerts       Alert[]
+  tickets      Ticket[]
+
+  @@index([sitio])
+  @@map("network_nodes")
+}
+
+model WifiNetwork {
+  id                 String   @id @default(cuid())
+  nodeId             String?
+  sitio              String
+  ssid               String
+  vlanId             Int
+  bandas             String[]
+  clientesConectados Int      @default(0)
+  throughputMbps     Float?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  node NetworkNode? @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+
+  @@unique([sitio, ssid])
+  @@map("wifi_networks")
+}
+
+enum AlertSeverity {
+  INFO
+  ADVERTENCIA
+  CRITICO
+}
+
+model Alert {
+  id        String        @id @default(cuid())
+  sitio     String
+  nodeId    String?
+  severidad AlertSeverity
+  mensaje   String
+  createdAt DateTime      @default(now())
+  ticketId  String?
+
+  node   NetworkNode? @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  ticket Ticket?      @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+
+  @@index([sitio])
+  @@map("alerts")
+}
+
+enum VlanReservationStatus {
+  RESERVADA
+  APLICADA
+  LIBERADA
+}
+
+model VlanReservation {
+  id             String                 @id @default(cuid())
+  vlanId         Int
+  redSolicitada  String
+  sitio          String
+  estado         VlanReservationStatus  @default(RESERVADA)
+  reservadoPorId String
+  planSnapshot   Json // diff propuesto en el momento de la reserva, para auditar contra lo aplicado
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  reservadoPor User     @relation(fields: [reservadoPorId], references: [id])
+  tickets      Ticket[]
+
+  // Una reserva activa por VLAN+sitio: la segunda solicitud debe recibir 409,
+  // nunca reintentar silenciosamente sobre la misma reserva.
+  @@unique([vlanId, sitio, estado])
+  @@map("vlan_reservations")
+}
+
+enum TicketStatus {
+  ABIERTO
+  EN_PROGRESO
+  ESCALADO
+  RESUELTO
+}
+
+model Ticket {
+  id                String        @id @default(cuid())
+  titulo            String
+  descripcion       String
+  severidad         AlertSeverity
+  estado            TicketStatus  @default(ABIERTO)
+  nodoAfectadoId    String?
+  vlanReservationId String?
+  asignadoAId       String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  nodoAfectado    NetworkNode?     @relation(fields: [nodoAfectadoId], references: [id], onDelete: SetNull)
+  vlanReservation VlanReservation? @relation(fields: [vlanReservationId], references: [id], onDelete: SetNull)
+  asignadoA       User?            @relation("TicketAssignee", fields: [asignadoAId], references: [id], onDelete: SetNull)
+  alerts          Alert[]
+  eventos         TicketEvent[]
+
+  @@index([estado])
+  @@index([severidad])
+  @@map("tickets")
+}
+
+enum TicketEventType {
+  CREADO
+  NOTIFICADO
+  REMEDIACION_INTENTADA
+  ESCALADO
+  RESUELTO
+  REABIERTO
+}
+
+model TicketEvent {
+  id        String          @id @default(cuid())
+  ticketId  String
+  tipo      TicketEventType
+  detalle   String
+  createdAt DateTime        @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@map("ticket_events")
+}
+
+// Auditoría de todo lo que toca infraestructura real: quién/qué worker,
+// qué tool/función, con qué parámetros, y el resultado. No editable desde
+// la aplicación (solo INSERT).
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  workerName String // p.ej. "worker-remediation", "chat-orchestrator"
+  toolName   String? // nombre de la tool del LLM invocada, si aplica
+  parametros Json
+  resultado  Json
+  exitoso    Boolean
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([workerName])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

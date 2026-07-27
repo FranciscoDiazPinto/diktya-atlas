@@ -1,0 +1,46 @@
+{
+  "name": "backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=.env src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "tsx prisma/seed.ts",
+    "worker:monitor": "tsx watch --env-file=.env src/workers/worker-monitor.ts",
+    "worker:triage": "tsx watch --env-file=.env src/workers/worker-triage.ts",
+    "worker:remediation": "tsx watch --env-file=.env src/workers/worker-remediation.ts",
+    "worker:ticket-followup": "tsx watch --env-file=.env src/workers/worker-ticket-followup.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@diktya-atlas/shared": "workspace:*",
+    "@fastify/cors": "^10.0.2",
+    "@fastify/multipart": "^9.0.3",
+    "@fastify/websocket": "^11.0.2",
+    "@prisma/client": "^6.2.1",
+    "bullmq": "^5.34.6",
+    "csv-parse": "^5.6.0",
+    "fastify": "^5.2.1",
+    "ioredis": "^5.4.2",
+    "redlock": "^5.0.0-beta.2",
+    "zod": "^3.24.1",
+    "zod-to-json-schema": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "dotenv": "^16.4.7",
+    "prisma": "^6.2.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.4"
+  }
+}

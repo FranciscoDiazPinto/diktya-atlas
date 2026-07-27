@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+/*
+ * Paleta de la skill dataviz (references/palette.md). Los colores de
+ * status son fijos (no se theman) y ya vienen validados por
+ * scripts/validate_palette.js — nunca color solo, siempre con
+ * ícono + etiqueta (ver components/ui/StatusDot.tsx y NodeStatusBadge).
+ */
+@theme {
+  --color-status-good: #0ca30c;
+  --color-status-warning: #fab219;
+  --color-status-serious: #ec835a;
+  --color-status-critical: #d03b3b;
+}
+
+:root {
+  color-scheme: light dark;
+  --surface: #fcfcfb;
+  --surface-page: #f9f9f7;
+  --ink-primary: #0b0b0b;
+  --ink-secondary: #52514e;
+  --ink-muted: #898781;
+  --border: #e1e0d9;
+  --accent: #2a78d6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #1a1a19;
+    --surface-page: #0d0d0d;
+    --ink-primary: #ffffff;
+    --ink-secondary: #c3c2b7;
+    --ink-muted: #898781;
+    --border: #2c2c2a;
+    --accent: #3987e5;
+  }
+}
+
+body {
+  background-color: var(--surface-page);
+  color: var(--ink-primary);
+}
