@@ -12,6 +12,8 @@ export interface LlmMessage {
   toolCallId?: string;
   /** Presente en mensajes role="tool": nombre de la tool invocada. */
   name?: string;
+  /** Presente en mensajes role="assistant" que pidieron ejecutar tools — necesario para reconstruir el turno al reenviarlo al proveedor. */
+  toolCalls?: LlmToolCall[];
 }
 
 export interface LlmToolDefinition {

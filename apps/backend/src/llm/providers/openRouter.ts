@@ -22,11 +22,24 @@ export function buildOpenAiStylePayload(model: string, params: LlmChatParams) {
       role: m.role,
       content: m.content,
       ...(m.role === "tool" ? { tool_call_id: m.toolCallId, name: m.name } : {}),
+      ...(m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0
+        ? {
+            tool_calls: m.toolCalls.map((tc) => ({
+              id: tc.id,
+              type: "function" as const,
+              function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
+            })),
+          }
+        : {}),
     })),
-    tools: params.tools.map((t) => ({
-      type: "function" as const,
-      function: { name: t.name, description: t.description, parameters: t.parameters },
-    })),
+    ...(params.tools.length > 0
+      ? {
+          tools: params.tools.map((t) => ({
+            type: "function" as const,
+            function: { name: t.name, description: t.description, parameters: t.parameters },
+          })),
+        }
+      : {}),
   };
 }
 
@@ -41,7 +54,7 @@ export function parseOpenAiStyleResponse(json: OpenAiStyleResponse): LlmChatResu
     arguments: JSON.parse(tc.function.arguments),
   }));
   return {
-    message: { role: "assistant", content: choice.message.content ?? "" },
+    message: { role: "assistant", content: choice.message.content ?? "", toolCalls },
     toolCalls,
   };
 }

@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Send } from "lucide-react";
+import { Send, Trash2 } from "lucide-react";
 import type { VlanPlan } from "@diktya-atlas/shared";
 import { useAuth } from "../../auth/AuthContext.js";
 import { useChat } from "../../hooks/useChat.js";
+import { useChatMessages } from "../../chat/ChatContext.js";
 import { CsvUploadZone } from "./CsvUploadZone.js";
 import { PlanDiffCard } from "./PlanDiffCard.js";
-import { ChatMessageCard, type ChatMessage } from "./ChatMessageCard.js";
+import { ChatMessageCard } from "./ChatMessageCard.js";
 import { EmptyState } from "../common/EmptyState.js";
 import { Button } from "../ui/Button.js";
 import type { CsvUploadResponse } from "../../types/api.js";
@@ -14,7 +15,7 @@ export function ChatView() {
   const { user } = useAuth();
   const role = user!.role;
   const chat = useChat();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const { messages, addMessage, clearMessages } = useChatMessages();
   const [input, setInput] = useState("");
   const [csvResult, setCsvResult] = useState<CsvUploadResponse | null>(null);
   const [plan, setPlan] = useState<VlanPlan | null>(null);
@@ -28,28 +29,47 @@ export function ChatView() {
     const text = input.trim();
     if (!text) return;
 
-    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "user", content: text }]);
+    const history = messages
+      .filter((m) => !m.isError)
+      .slice(-20)
+      .map((m) => ({ role: m.role, content: m.content }));
+
+    addMessage({ id: crypto.randomUUID(), role: "user", content: text });
     setInput("");
 
-    chat.mutate(text, {
-      onSuccess: (data) => {
-        setMessages((prev) => [
-          ...prev,
-          { id: crypto.randomUUID(), role: "assistant", content: data.mensaje, toolResults: data.toolResults },
-        ]);
-      },
-      onError: (err) => {
-        setMessages((prev) => [
-          ...prev,
-          { id: crypto.randomUUID(), role: "assistant", content: `Error: ${(err as Error).message}` },
-        ]);
-      },
-    });
+    chat.mutate(
+      { message: text, history },
+      {
+        onSuccess: (data) => {
+          addMessage({
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: data.mensaje,
+            toolResults: data.toolResults,
+          });
+        },
+        onError: (err) => {
+          addMessage({
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: `Error: ${(err as Error).message}`,
+            isError: true,
+          });
+        },
+      }
+    );
   }
 
   return (
     <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
       <div className="flex flex-col gap-3">
+        {messages.length > 0 && (
+          <div className="flex justify-end">
+            <Button size="sm" variant="ghost" onClick={clearMessages} title="Borrar conversación">
+              <Trash2 className="h-3.5 w-3.5" /> Borrar conversación
+            </Button>
+          </div>
+        )}
         <div className="flex min-h-[300px] flex-col gap-3 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
           {messages.length === 0 ? (
             <EmptyState

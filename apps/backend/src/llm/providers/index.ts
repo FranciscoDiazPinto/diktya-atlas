@@ -25,7 +25,7 @@ export function getLlmProvider(): LlmProvider {
     case "openrouter":
     default:
       if (!env.OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY no configurada");
-      instance = new OpenRouterProvider(env.OPENROUTER_API_KEY);
+      instance = new OpenRouterProvider(env.OPENROUTER_API_KEY, env.OPENROUTER_MODEL);
       break;
   }
   return instance;

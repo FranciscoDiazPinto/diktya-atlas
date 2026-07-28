@@ -19,6 +19,14 @@ function toAnthropicMessage(m: LlmMessage) {
       content: [{ type: "tool_result", tool_use_id: m.toolCallId, content: m.content }],
     };
   }
+  if (m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0) {
+    const blocks: Array<Record<string, unknown>> = [];
+    if (m.content) blocks.push({ type: "text", text: m.content });
+    for (const tc of m.toolCalls) {
+      blocks.push({ type: "tool_use", id: tc.id, name: tc.name, input: tc.arguments });
+    }
+    return { role: "assistant" as const, content: blocks };
+  }
   return {
     role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
     content: [{ type: "text", text: m.content }],
@@ -51,11 +59,14 @@ export class AnthropicProvider implements LlmProvider {
         max_tokens: this.maxTokens,
         system: systemText || undefined,
         messages: conversation,
-        tools: params.tools.map((t) => ({
-          name: t.name,
-          description: t.description,
-          input_schema: t.parameters,
-        })),
+        tools:
+          params.tools.length > 0
+            ? params.tools.map((t) => ({
+                name: t.name,
+                description: t.description,
+                input_schema: t.parameters,
+              }))
+            : undefined,
       }),
     });
     if (!res.ok) {
@@ -71,6 +82,6 @@ export class AnthropicProvider implements LlmProvider {
       .filter((b) => b.type === "tool_use")
       .map((b) => ({ id: b.id!, name: b.name!, arguments: b.input }));
 
-    return { message: { role: "assistant", content: text }, toolCalls };
+    return { message: { role: "assistant", content: text, toolCalls }, toolCalls };
   }
 }

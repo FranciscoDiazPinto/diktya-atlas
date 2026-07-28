@@ -8,6 +8,8 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   toolResults?: ChatToolResult[];
+  /** Error de red/cliente mostrado como si fuera respuesta del asistente — se excluye del historial que se reenvía al LLM. */
+  isError?: boolean;
 }
 
 export function ChatMessageCard({ message }: { message: ChatMessage }) {
