@@ -20,6 +20,7 @@ const EnvSchema = z.object({
   UNIFI_SITE: z.string().default("default"),
   UNIFI_VERIFY_TLS: z.coerce.boolean().default(true),
 
+  OPNSENSE_MODE: z.enum(["mock", "live"]).default("mock"),
   OPNSENSE_HOST: z.string().optional(),
   OPNSENSE_API_KEY: z.string().optional(),
   OPNSENSE_API_SECRET: z.string().optional(),
@@ -30,6 +31,7 @@ const EnvSchema = z.object({
 
   LLM_PROVIDER: z.enum(["openrouter", "anthropic", "openai"]).default("openrouter"),
   OPENROUTER_API_KEY: z.string().optional(),
+  OPENROUTER_MODEL: z.string().default("anthropic/claude-sonnet-4.5"),
   ANTHROPIC_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_BASE_URL: z.string().optional(),

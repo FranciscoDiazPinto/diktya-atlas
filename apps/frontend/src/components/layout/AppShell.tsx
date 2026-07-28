@@ -1,5 +1,17 @@
+import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { MessageSquare, Network, Ticket as TicketIcon, Wifi, WifiOff, LogOut } from "lucide-react";
+import {
+  MessageSquare,
+  Network,
+  Ticket as TicketIcon,
+  Map,
+  Router,
+  Wifi,
+  WifiOff,
+  LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
+} from "lucide-react";
 import { cn } from "../../lib/cn.js";
 import { useAuth } from "../../auth/AuthContext.js";
 import { useNetworkStatus } from "../../hooks/useNetworkStatus.js";
@@ -12,9 +24,15 @@ const NAV_ITEMS = [
   { to: "/chat", label: "Chat", icon: MessageSquare },
   { to: "/red", label: "Red", icon: Network },
   { to: "/tickets", label: "Tickets", icon: TicketIcon },
+  { to: "/planos", label: "Planos", icon: Map },
 ];
 
+/** Solo ADMIN — infraestructura core (OPNsense/UniFi), no el despliegue de un evento. */
+const ADMIN_NAV_ITEMS = [{ to: "/infra", label: "Infraestructura", icon: Router }];
+
 const ROLE_LABEL: Record<string, string> = { ADMIN: "Admin", TECNICO: "Técnico", VISUALIZADOR: "Visualizador" };
+
+const SIDEBAR_COLLAPSED_KEY = "atlas-sidebar-collapsed";
 
 function globalHealth(status?: { alertasPorSeveridad: { CRITICO: number; ADVERTENCIA: number } }): {
   tone: StatusTone;
@@ -32,37 +50,66 @@ export function AppShell() {
   const { connected } = useRealtime();
   const health = globalHealth(status);
 
-  return (
-    <div className="min-h-screen">
-      <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-3">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <img src="/diktya-icon.png" alt="" className="h-6 w-6" />
-              <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">NetBot</span>
-            </div>
-            <nav className="flex items-center gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
-              {NAV_ITEMS.map(({ to, label: navLabel, icon: Icon }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  className={({ isActive }) =>
-                    cn(
-                      "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                      isActive
-                        ? "bg-white text-brand-navy shadow-sm dark:bg-slate-900 dark:text-brand-cyan"
-                        : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
-                    )
-                  }
-                >
-                  <Icon className="h-4 w-4" />
-                  {navLabel}
-                </NavLink>
-              ))}
-            </nav>
-          </div>
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1");
 
-          <div className="flex items-center gap-4">
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
+  }, [collapsed]);
+
+  return (
+    <div className="flex min-h-screen">
+      <aside
+        className={cn(
+          "flex shrink-0 flex-col border-r border-slate-200 bg-white transition-[width] duration-200 dark:border-slate-800 dark:bg-slate-900",
+          collapsed ? "w-16" : "w-60"
+        )}
+      >
+        <div className={cn("flex items-center gap-3 px-4 py-5", collapsed && "justify-center px-0")}>
+          <img src="/diktya-icon.png" alt="Diktya" className="h-10 w-10 shrink-0" />
+          {!collapsed && (
+            <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Atlas</span>
+          )}
+        </div>
+
+        <nav className="flex flex-1 flex-col gap-1 px-2">
+          {[...NAV_ITEMS, ...(user?.role === "ADMIN" ? ADMIN_NAV_ITEMS : [])].map(({ to, label: navLabel, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              title={collapsed ? navLabel : undefined}
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  collapsed && "justify-center px-0",
+                  isActive
+                    ? "bg-brand-navy/10 text-brand-navy dark:bg-brand-cyan/10 dark:text-brand-cyan"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                )
+              }
+            >
+              <Icon className="h-5 w-5 shrink-0" />
+              {!collapsed && navLabel}
+            </NavLink>
+          ))}
+        </nav>
+
+        <button
+          type="button"
+          onClick={() => setCollapsed((c) => !c)}
+          title={collapsed ? "Expandir menú" : "Contraer menú"}
+          className={cn(
+            "m-2 flex items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white",
+            collapsed && "justify-center px-0"
+          )}
+        >
+          {collapsed ? <PanelLeftOpen className="h-5 w-5 shrink-0" /> : <PanelLeftClose className="h-5 w-5 shrink-0" />}
+          {!collapsed && "Contraer"}
+        </button>
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-center justify-end gap-4 px-4 py-3">
             <div
               className="flex items-center gap-2 text-sm"
               title={connected ? "Conectado en tiempo real" : "Reconectando..."}
@@ -93,13 +140,13 @@ export function AppShell() {
               </div>
             )}
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6">
-        <DashboardSummaryStrip />
-        <Outlet />
-      </main>
+        <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-4 py-6">
+          <DashboardSummaryStrip />
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

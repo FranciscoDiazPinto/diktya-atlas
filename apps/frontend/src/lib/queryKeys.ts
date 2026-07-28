@@ -12,6 +12,7 @@ export interface TicketFilters {
 export const queryKeys = {
   networkStatus: (sitio?: string) => ["network-status", sitio ?? null] as const,
   nodeDetail: (id: string) => ["network-node", id] as const,
+  opnsenseStatus: () => ["opnsense-status"] as const,
   tickets: (filters: TicketFilters) => ["tickets", filters] as const,
   ticketDetail: (id: string) => ["ticket", id] as const,
 };

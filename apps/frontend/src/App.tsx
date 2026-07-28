@@ -8,6 +8,9 @@ import { ChatView } from "./components/chat/ChatView.js";
 import { NetworkView } from "./components/network/NetworkView.js";
 import { TicketsView } from "./components/tickets/TicketsView.js";
 import { TicketDetailView } from "./components/tickets/TicketDetailView.js";
+import { PlanosView } from "./components/planos/PlanosView.js";
+import { InfraView } from "./components/infra/InfraView.js";
+import { ChatProvider } from "./chat/ChatContext.js";
 
 function RequireAuth() {
   const { status } = useAuth();
@@ -19,6 +22,13 @@ function RequireAuth() {
     );
   }
   if (status === "unauthenticated") return <Navigate to="/login" replace />;
+  return <Outlet />;
+}
+
+/** Bloquea la ruta por rol, no solo los botones dentro de ella — para vistas con contenido sensible (ej. infra core). */
+function RequireRole({ roles }: { roles: string[] }) {
+  const { user } = useAuth();
+  if (!user || !roles.includes(user.role)) return <Navigate to="/chat" replace />;
   return <Outlet />;
 }
 
@@ -40,12 +50,22 @@ export default function App() {
         }
       />
       <Route element={<RequireAuth />}>
-        <Route element={<AppShell />}>
+        <Route
+          element={
+            <ChatProvider>
+              <AppShell />
+            </ChatProvider>
+          }
+        >
           <Route index element={<Navigate to="/chat" replace />} />
           <Route path="/chat" element={<ChatView />} />
           <Route path="/red" element={<NetworkView />} />
           <Route path="/tickets" element={<TicketsView />} />
           <Route path="/tickets/:ticketId" element={<TicketDetailView />} />
+          <Route path="/planos" element={<PlanosView />} />
+          <Route element={<RequireRole roles={["ADMIN"]} />}>
+            <Route path="/infra" element={<InfraView />} />
+          </Route>
           <Route path="*" element={<Navigate to="/chat" replace />} />
         </Route>
       </Route>
