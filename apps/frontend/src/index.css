@@ -11,6 +11,21 @@
   --color-status-warning: #fab219;
   --color-status-serious: #ec835a;
   --color-status-critical: #d03b3b;
+
+  /*
+   * Paleta de marca Diktya, extraída del logo (public/diktya-icon.png).
+   * navy #112f47 / cyan #0090d6, verificados con WCAG:
+   *   navy sobre blanco   13.8:1 -> texto/botones en modo claro
+   *   cyan sobre blanco    3.5:1 -> falla texto chico, sirve para íconos/
+   *                                 elementos grandes; para links usar
+   *                                 -hover (más oscuro) en modo claro
+   *   cyan sobre superficie oscura 4.9:1 -> ok como texto en modo oscuro
+   *   navy sobre superficie oscura 1.3:1 -> NO USAR navy en modo oscuro
+   */
+  --color-brand-navy: #112f47;
+  --color-brand-navy-hover: #3b5468;
+  --color-brand-cyan: #0090d6;
+  --color-brand-cyan-hover: #007ab5;
 }
 
 :root {
@@ -21,7 +36,6 @@
   --ink-secondary: #52514e;
   --ink-muted: #898781;
   --border: #e1e0d9;
-  --accent: #2a78d6;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -32,7 +46,6 @@
     --ink-secondary: #c3c2b7;
     --ink-muted: #898781;
     --border: #2c2c2a;
-    --accent: #3987e5;
   }
 }
 

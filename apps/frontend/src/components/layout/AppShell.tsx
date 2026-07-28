@@ -37,7 +37,10 @@ export function AppShell() {
       <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-3">
           <div className="flex items-center gap-6">
-            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">NetBot</span>
+            <div className="flex items-center gap-2">
+              <img src="/diktya-icon.png" alt="" className="h-6 w-6" />
+              <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">NetBot</span>
+            </div>
             <nav className="flex items-center gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
               {NAV_ITEMS.map(({ to, label: navLabel, icon: Icon }) => (
                 <NavLink
@@ -47,7 +50,7 @@ export function AppShell() {
                     cn(
                       "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                       isActive
-                        ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white"
+                        ? "bg-white text-brand-navy shadow-sm dark:bg-slate-900 dark:text-brand-cyan"
                         : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
                     )
                   }

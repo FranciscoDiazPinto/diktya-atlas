@@ -44,7 +44,8 @@ export function LoginView() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 dark:bg-slate-950">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-slate-50 px-4 dark:bg-slate-950">
+      <img src="/diktya-logo.png" alt="Diktya" className="h-16 w-auto" />
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>NetBot</CardTitle>

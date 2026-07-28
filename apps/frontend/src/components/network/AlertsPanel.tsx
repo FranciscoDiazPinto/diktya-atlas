@@ -19,7 +19,10 @@ export function AlertsPanel({ alertas }: { alertas: ApiAlert[] }) {
           <div className="flex items-center gap-2">
             <SeverityBadge severidad={alert.severidad} />
             {alert.ticketId ? (
-              <Link to={`/tickets/${alert.ticketId}`} className="text-xs text-blue-600 underline dark:text-blue-400">
+              <Link
+                to={`/tickets/${alert.ticketId}`}
+                className="text-xs text-brand-cyan-hover underline dark:text-brand-cyan"
+              >
                 Ver ticket
               </Link>
             ) : (
