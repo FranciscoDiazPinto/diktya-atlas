@@ -63,6 +63,21 @@ export function createApiClient(opts: ApiClientOptions) {
         credentials: "include",
         body: form,
       }).then((r) => handleResponse<T>(r)),
+
+    patch: <T>(path: string, body?: unknown): Promise<T> =>
+      fetch(`${API_BASE_URL}${path}`, {
+        method: "PATCH",
+        headers: buildHeaders(opts, { "content-type": "application/json" }),
+        credentials: "include",
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      }).then((r) => handleResponse<T>(r)),
+
+    del: <T>(path: string): Promise<T> =>
+      fetch(`${API_BASE_URL}${path}`, {
+        method: "DELETE",
+        headers: buildHeaders(opts),
+        credentials: "include",
+      }).then((r) => handleResponse<T>(r)),
   };
 }
 

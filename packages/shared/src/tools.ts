@@ -2,6 +2,7 @@ import { z } from "zod";
 import { RoleSchema } from "./roles.js";
 import { AlertSeveritySchema } from "./network.js";
 import { CsvRowSchema } from "./vlan.js";
+import { ApModelSchema } from "./mapping.js";
 
 /**
  * Contratos de las tools que el LLM puede invocar. El LLM NUNCA ejecuta
@@ -50,6 +51,36 @@ export const NotifyTechniciansInputSchema = z.object({
   sitio: z.string().optional(),
 });
 
+export const ListEventsInputSchema = z.object({
+  nombre: z.string().optional(),
+});
+
+export const ListEventZonesInputSchema = z.object({
+  eventDeploymentId: z.string(),
+});
+
+export const GetCoverageAtPointInputSchema = z.object({
+  eventZoneId: z.string(),
+  x: z.number(),
+  y: z.number(),
+});
+
+export const FindCoverageGapsInputSchema = z.object({
+  eventZoneId: z.string(),
+  planWidthPx: z.number().positive(),
+  planHeightPx: z.number().positive(),
+  cellSizeMeters: z.number().positive().optional(),
+});
+
+export const PlaceApInputSchema = z.object({
+  eventZoneId: z.string(),
+  modelo: ApModelSchema,
+  x: z.number(),
+  y: z.number(),
+  radioMetros: z.number().nonnegative().optional(),
+  rackLabel: z.string().optional(),
+});
+
 export const toolSchemas = {
   get_network_status: GetNetworkStatusInputSchema,
   get_ap_detail: GetApDetailInputSchema,
@@ -59,6 +90,11 @@ export const toolSchemas = {
   create_ticket: CreateTicketInputSchema,
   escalate_ticket: EscalateTicketInputSchema,
   notify_technicians: NotifyTechniciansInputSchema,
+  list_events: ListEventsInputSchema,
+  list_event_zones: ListEventZonesInputSchema,
+  get_coverage_at_point: GetCoverageAtPointInputSchema,
+  find_coverage_gaps: FindCoverageGapsInputSchema,
+  place_ap: PlaceApInputSchema,
 } as const;
 
 export type ToolName = keyof typeof toolSchemas;
@@ -78,6 +114,11 @@ export const toolsByRole: Record<z.infer<typeof RoleSchema>, ToolName[]> = {
     "create_ticket",
     "escalate_ticket",
     "notify_technicians",
+    "list_events",
+    "list_event_zones",
+    "get_coverage_at_point",
+    "find_coverage_gaps",
+    "place_ap",
   ],
   TECNICO: [
     "get_network_status",
@@ -87,6 +128,17 @@ export const toolsByRole: Record<z.infer<typeof RoleSchema>, ToolName[]> = {
     "apply_vlan_plan",
     "create_ticket",
     "notify_technicians",
+    "list_events",
+    "list_event_zones",
+    "get_coverage_at_point",
+    "find_coverage_gaps",
+    "place_ap",
   ],
-  VISUALIZADOR: ["get_network_status"],
+  VISUALIZADOR: [
+    "get_network_status",
+    "list_events",
+    "list_event_zones",
+    "get_coverage_at_point",
+    "find_coverage_gaps",
+  ],
 };

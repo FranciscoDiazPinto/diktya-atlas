@@ -76,6 +76,7 @@ model NetworkNode {
   wifiNetworks WifiNetwork[]
   alerts       Alert[]
   tickets      Ticket[]
+  apPlacement  ApPlacement?
 
   @@index([sitio])
   @@map("network_nodes")
@@ -217,4 +218,95 @@ model AuditLog {
   @@index([workerName])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// --- Mapeo de planos y ubicación de APs ---
+// Vocabulario alineado con la operación real de Diktya: Venue = "recinto"
+// (plano base reutilizable entre eventos), EventDeployment = el evento en
+// sí (ej. "Expomin 2026"), EventZone = cada plano/pabellón/estacionamiento
+// que ese evento efectivamente despliega — un evento grande puede tener
+// varias zonas, cada una en un recinto distinto y con su propia escala.
+
+enum ApModel {
+  U6_MESH // AP de cobertura, exterior/mesh
+  U7_CAMPUS // AP de cobertura, alta densidad
+  PRO_MAX_24 // switch de rack perimetral, sin radio de cobertura
+  FLEX_MINI // switch compacto, sin radio de cobertura
+  FLEX // switch, sin radio de cobertura
+  FLEX_ULTRA // switch, sin radio de cobertura
+}
+
+enum DeploymentEstado {
+  PLANIFICACION
+  EN_CURSO
+  FINALIZADO
+}
+
+model Venue {
+  id           String   @id @default(cuid())
+  nombre       String
+  planFilePath String // PDF/imagen del plano base, ruta relativa a uploads/
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  zonas EventZone[]
+
+  @@map("venues")
+}
+
+model EventDeployment {
+  id        String           @id @default(cuid())
+  nombre    String
+  fecha     DateTime
+  estado    DeploymentEstado @default(PLANIFICACION)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  zonas EventZone[]
+
+  @@map("event_deployments")
+}
+
+model EventZone {
+  id                String   @id @default(cuid())
+  eventDeploymentId String
+  venueId           String
+  nombreZona        String // ej. "Pabellón 3", "Estacionamiento Norte"
+  // Override del plano del Venue (ej. ya anotado con la red de esta zona
+  // puntual); si es null se usa el planFilePath del Venue.
+  planFilePath      String?
+  pixelesPorMetro   Float? // calibración de escala PROPIA de esta zona (ver coverage.service)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  eventDeployment EventDeployment @relation(fields: [eventDeploymentId], references: [id], onDelete: Cascade)
+  venue           Venue           @relation(fields: [venueId], references: [id])
+  aps             ApPlacement[]
+
+  @@index([eventDeploymentId])
+  @@index([venueId])
+  @@map("event_zones")
+}
+
+model ApPlacement {
+  id            String   @id @default(cuid())
+  eventZoneId   String
+  modelo        ApModel
+  // Coordenadas en píxeles sobre el plano renderizado (canvas del frontend),
+  // no en metros — se convierten usando pixelesPorMetro de la EventZone.
+  x             Float
+  y             Float
+  radioMetros   Float // default por modelo al crear, editable después
+  rackLabel     String? // ej. "Rack 3" — responde qué rack cubre qué área
+  // Enlace opcional al equipo real una vez adoptado en UniFi (hoy 0 de 11
+  // equipos de borde están adoptados, así que esto normalmente queda null).
+  networkNodeId String?  @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  eventZone   EventZone    @relation(fields: [eventZoneId], references: [id], onDelete: Cascade)
+  networkNode NetworkNode? @relation(fields: [networkNodeId], references: [id], onDelete: SetNull)
+
+  @@index([eventZoneId])
+  @@map("ap_placements")
 }

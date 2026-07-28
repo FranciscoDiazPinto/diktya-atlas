@@ -1,4 +1,4 @@
-import type { CsvRowResult, VlanPlan, Role } from "@diktya-atlas/shared";
+import type { CsvRowResult, VlanPlan, Role, ApModel, CoveragePoint, CoverageGapCell } from "@diktya-atlas/shared";
 
 export interface PublicUser {
   id: string;
@@ -109,6 +109,45 @@ export interface NetworkStatusSummary {
   alertasRecientes: ApiAlert[];
 }
 
+/**
+ * Estado en vivo del cliente OPNsense (mock hoy — fase 2 para real, ver
+ * integrations/opnsense). A diferencia de NetworkStatusSummary (que lee de
+ * Postgres, sincronizado desde UniFi), esto viene directo del dominio del
+ * cliente en cada request, por eso el shape difiere un poco (status en
+ * minúsculas, `alertas` en vez de `alertasRecientes`, sin `adoptando`).
+ */
+export interface OpnsenseNode {
+  id: string;
+  sitio: string;
+  nombre: string;
+  modelo?: string;
+  status: "online" | "offline" | "adopting" | "unknown";
+  senalDbm?: number;
+  clientesConectados: number;
+  uptimeSegundos?: number;
+  ultimaVezVisto: string;
+  ssidsTransmitidos: string[];
+}
+
+export interface OpnsenseAlert {
+  id: string;
+  sitio: string;
+  nodeId?: string;
+  severidad: ApiAlertSeverity;
+  mensaje: string;
+  creadoEn: string;
+  ticketId?: string;
+}
+
+export interface OpnsenseStatusSummary {
+  totalNodos: number;
+  online: number;
+  offline: number;
+  alertasPorSeveridad: Record<ApiAlertSeverity, number>;
+  nodos: OpnsenseNode[];
+  alertas: OpnsenseAlert[];
+}
+
 export interface ApNodeDetail extends ApiNetworkNode {
   wifiNetworks: ApiWifiNetwork[];
   alerts: ApiAlert[];
@@ -156,3 +195,58 @@ export interface ChatResponse {
   mensaje: string;
   toolResults: ChatToolResult[];
 }
+
+// --- Mapeo de planos y ubicación de APs ---
+
+export type DeploymentEstado = "PLANIFICACION" | "EN_CURSO" | "FINALIZADO";
+
+export interface ApiVenue {
+  id: string;
+  nombre: string;
+  planFilePath: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApiEventDeployment {
+  id: string;
+  nombre: string;
+  fecha: string;
+  estado: DeploymentEstado;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApiEventDeploymentDetail extends ApiEventDeployment {
+  zonas: ApiEventZone[];
+}
+
+export interface ApiEventZone {
+  id: string;
+  eventDeploymentId: string;
+  venueId: string;
+  nombreZona: string;
+  planFilePath: string | null;
+  pixelesPorMetro: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApiEventZoneDetail extends ApiEventZone {
+  venue: ApiVenue;
+  aps: ApiApPlacement[];
+}
+
+export interface ApiApPlacement {
+  id: string;
+  eventZoneId: string;
+  modelo: ApModel;
+  x: number;
+  y: number;
+  radioMetros: number;
+  rackLabel: string | null;
+  networkNodeId: string | null;
+}
+
+export type { CoveragePoint, CoverageGapCell };
+

@@ -10,6 +10,11 @@ import { generateVlanPlan } from "../../services/planDiff.service.js";
 import { reserveVlanPlanItems, enqueueApplyVlanPlan } from "../../services/vlanFlow.service.js";
 import { createTicket, escalateTicket } from "../../services/ticket.service.js";
 import { notifyTechnicians } from "../../services/notification.service.js";
+import { getCoverageAtPoint, findCoverageGaps } from "../../services/coverage.service.js";
+import { placeAp } from "../../services/apPlacement.service.js";
+import { listEventDeployments } from "../../services/eventDeployment.service.js";
+import { listEventZones } from "../../services/eventZone.service.js";
+import type { ApModel } from "@prisma/client";
 
 type ToolHandler = (args: never, ctx: RequestContext) => Promise<unknown>;
 
@@ -37,6 +42,25 @@ const handlers: Record<ToolName, ToolHandler> = {
     await notifyTechnicians(args as never);
     return { enviado: true };
   }) as ToolHandler,
+  list_events: (async (args: { nombre?: string }) => listEventDeployments(args.nombre)) as ToolHandler,
+  list_event_zones: (async (args: { eventDeploymentId: string }) =>
+    listEventZones(args.eventDeploymentId)) as ToolHandler,
+  get_coverage_at_point: (async (args: { eventZoneId: string; x: number; y: number }) =>
+    getCoverageAtPoint(args.eventZoneId, args.x, args.y)) as ToolHandler,
+  find_coverage_gaps: (async (args: {
+    eventZoneId: string;
+    planWidthPx: number;
+    planHeightPx: number;
+    cellSizeMeters?: number;
+  }) => findCoverageGaps(args.eventZoneId, args.planWidthPx, args.planHeightPx, args.cellSizeMeters)) as ToolHandler,
+  place_ap: (async (args: {
+    eventZoneId: string;
+    modelo: ApModel;
+    x: number;
+    y: number;
+    radioMetros?: number;
+    rackLabel?: string;
+  }) => placeAp(args)) as ToolHandler,
 };
 
 export async function executeTool(toolName: string, rawArgs: unknown, ctx: RequestContext): Promise<unknown> {

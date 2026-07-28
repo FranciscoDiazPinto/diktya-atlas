@@ -21,6 +21,16 @@ export const toolDescriptions: Record<ToolName, string> = {
   create_ticket: "Crea un ticket de incidencia con severidad, descripción y nodo/reserva asociados.",
   escalate_ticket: "Escala un ticket existente (ej. a un admin) indicando el motivo.",
   notify_technicians: "Envía una notificación al grupo de técnicos configurado, con severidad y mensaje.",
+  list_events:
+    "Lista eventos (opcionalmente filtrados por nombre, ej. 'Expomin') para encontrar el eventDeploymentId antes de listar sus zonas.",
+  list_event_zones:
+    "Lista las zonas/pabellones/planos de un evento (un evento grande puede tener varios, ej. 'Pabellón 3', 'Estacionamiento') — usar para encontrar el eventZoneId antes de consultar cobertura o colocar un AP.",
+  get_coverage_at_point:
+    "Consulta si un punto (x,y en píxeles) del plano de una zona de evento tiene cobertura WiFi, y con qué AP(s) y a qué distancia.",
+  find_coverage_gaps:
+    "Barre en grilla el plano de una zona de evento y devuelve las áreas sin cobertura de ningún AP — usar para responder si hace falta instalar un AP en algún lugar.",
+  place_ap:
+    "Coloca un AP (o switch de rack) en el plano de una zona de evento, en coordenadas x,y con su modelo y radio de cobertura (con default por modelo si no se especifica).",
 };
 
 export function toolSchemaFor(name: ToolName) {
