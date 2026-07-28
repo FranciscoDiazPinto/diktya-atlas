@@ -1,5 +1,7 @@
 # Diktya Atlas — NetBot
 
+[![GitHub Repo](https://img.shields.io/badge/GitHub-diktya--atlas-181717?logo=github&logoColor=white)](https://github.com/FranciscoDiazPinto/diktya-atlas)
+
 Agente conversacional que automatiza la gestión de redes (UniFi + OPNsense, con
 integración a Proxmox para usuarios) orquestado por un LLM externo.
 
