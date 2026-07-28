@@ -11,7 +11,8 @@ import { Button } from "../ui/Button.js";
 import type { CsvUploadResponse } from "../../types/api.js";
 
 export function ChatView() {
-  const { role } = useAuth();
+  const { user } = useAuth();
+  const role = user!.role;
   const chat = useChat();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");

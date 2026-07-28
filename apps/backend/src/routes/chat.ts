@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { getRequestContext } from "../auth/context.js";
+import { authenticate } from "../auth/middleware.js";
 import { getToolsForRole } from "../llm/tools/registry.js";
 import { executeTool } from "../llm/tools/executor.js";
 import { getLlmProvider } from "../llm/providers/index.js";
@@ -28,8 +28,10 @@ function buildSystemPrompt(role: string): string {
  * conversación por sesión es un deliverable del prompt de frontend.
  */
 export async function chatRoutes(fastify: FastifyInstance) {
+  fastify.addHook("preHandler", authenticate);
+
   fastify.post("/chat", async (request, reply) => {
-    const ctx = getRequestContext(request);
+    const ctx = request.authContext!;
     const { message } = ChatBodySchema.parse(request.body);
     const tools = getToolsForRole(ctx.role);
 

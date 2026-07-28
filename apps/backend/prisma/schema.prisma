@@ -18,6 +18,11 @@ model User {
   email        String   @unique
   passwordHash String
   role         Role
+  // TOTP obligatorio para ADMIN/TECNICO (ver auth/totp.ts). totpSecret queda
+  // set desde el paso de setup aunque todavía no esté confirmado — solo
+  // totpEnabled=true habilita el login sin volver a pasar por setup.
+  totpSecret   String?
+  totpEnabled  Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

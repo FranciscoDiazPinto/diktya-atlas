@@ -32,7 +32,8 @@ function useCountdown(targetMs: number | null): string | null {
 
 export function TicketDetailView() {
   const { ticketId } = useParams();
-  const { role } = useAuth();
+  const { user } = useAuth();
+  const role = user!.role;
   const { data: ticket, isLoading, isError, error, refetch } = useTicketDetail(ticketId);
   const resolveMutation = useResolveTicket();
 

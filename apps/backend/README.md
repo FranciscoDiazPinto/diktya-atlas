@@ -30,7 +30,7 @@ cp .env.example apps/backend/.env
 
 cd apps/backend
 npx prisma migrate dev   # crea el schema
-npx prisma db seed       # crea los 3 usuarios de desarrollo (ver auth stub)
+npx prisma db seed       # crea los 3 usuarios de desarrollo (ver Auth)
 
 pnpm dev                 # levanta el servidor Fastify en :3000
 ```
@@ -47,22 +47,31 @@ pnpm worker:ticket-followup
 
 `GET http://localhost:3000/health` para confirmar que el servidor levantó.
 
-## Auth stub (temporal)
+## Auth
 
-No hay JWT real todavía (eso lo implementa el prompt de seguridad). Las
-rutas leen el rol del header `x-role` (`ADMIN` | `TECNICO` | `VISUALIZADOR`,
-default `VISUALIZADOR`) y opcionalmente `x-user-id` (default a uno de los
-3 usuarios sembrados por el seed: `dev-admin`, `dev-tecnico`,
-`dev-visualizador`). Ejemplo:
+JWT (access token 15 min) + refresh token opaco en cookie httpOnly con
+rotación (detecta reuso y revoca toda la sesión) + 2FA TOTP obligatorio
+para ADMIN/TECNICO. Detalle completo, matriz de permisos y estrategia de
+despliegue en [`SECURITY.md`](../../SECURITY.md) (raíz del repo).
+
+Los 3 usuarios sembrados por el seed (`admin@dev.local`,
+`tecnico@dev.local`, `visualizador@dev.local`) comparten la password
+`NetBotDev123!` (dev-only, ver `prisma/seed.ts`) y arrancan sin 2FA
+configurado — el primer login de ADMIN/TECNICO dispara el flujo de setup.
 
 ```bash
-curl -X POST http://localhost:3000/vlan/reserve \
-  -H "x-role: TECNICO" -H "content-type: application/json" \
-  -d '{"planId":"..."}'
+curl -X POST http://localhost:3000/auth/login \
+  -H "content-type: application/json" \
+  -d '{"email":"visualizador@dev.local","password":"NetBotDev123!"}'
+# -> {"status":"ok","accessToken":"...", "user": {...}}, cookie de refresh en Set-Cookie
+
+curl http://localhost:3000/network/status -H "authorization: Bearer <accessToken>"
 ```
 
-**No usar este stub en producción**: cualquiera que mande `x-role: ADMIN`
-obtiene privilegios de admin.
+**Fallback de dev**: con `ALLOW_DEV_ROLE_HEADER=true` (default fuera de
+producción), las rutas también aceptan `x-role`/`x-user-id` sin JWT, para
+scripts rápidos de curl. Se fuerza a `false` automáticamente si
+`NODE_ENV=production` — nunca desplegar con esto habilitado.
 
 ## UniFi: mock vs live
 
@@ -81,9 +90,10 @@ pnpm test
 
 Corre contra Postgres/Redis reales (los del `docker compose up -d` de
 arriba) con `UNIFI_MODE=mock`. Cubre: el cliente UniFi mock, el 409 de
-reserva de VLAN duplicada, y el flujo end-to-end completo (CSV → plan →
+reserva de VLAN duplicada, el flujo end-to-end completo (CSV → plan →
 reserva → aplicar, pasando por lock distribuido + verificación
-post-escritura).
+post-escritura), y auth (password, TOTP, rotación de sesión con detección
+de reuso, y las rutas de `/auth/*` con `app.inject()` end-to-end).
 
 ## Flujo end-to-end de ejemplo
 
@@ -96,9 +106,8 @@ post-escritura).
    `remediation-queue`; `worker-remediation` es el único que escribe de
    verdad, siempre bajo lock + verificación post-escritura + rollback.
 
-## Fuera de alcance de esta primera pasada
+## Fuera de alcance
 
-Ver el prompt original: frontend real, auth/roles reales (JWT/2FA), cliente
-OPNsense real, y llamadas LLM en vivo sin API key configurada. El código
-deja los puntos de extensión listos (interfaces, contratos Zod) para cada
-uno.
+Cliente OPNsense real, llamadas LLM en vivo sin API key configurada,
+auth del WebSocket (`GET /ws`), y UI de gestión de usuarios/roles — ver el
+detalle de cada uno en [`SECURITY.md`](../../SECURITY.md#pendientes-explícitos-fuera-de-alcance-de-esta-pasada).

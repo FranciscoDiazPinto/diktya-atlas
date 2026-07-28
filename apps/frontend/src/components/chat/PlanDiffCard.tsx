@@ -22,7 +22,8 @@ const ACCION_VARIANT: Record<string, "success" | "info" | "neutral"> = {
  * separados y explícitos por fila, con el diff siempre visible.
  */
 export function PlanDiffCard({ plan, onDismiss }: { plan: VlanPlan; onDismiss: () => void }) {
-  const { role } = useAuth();
+  const { user } = useAuth();
+  const role = user!.role;
   const canWrite = role === "ADMIN" || role === "TECNICO";
   const reserve = useReserveVlan();
   const apply = useApplyVlan();

@@ -1,53 +1,108 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
-import { RoleSchema, type Role } from "@diktya-atlas/shared";
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import * as authApi from "../lib/authApi.js";
+import type { PublicUser, Setup2faResponse } from "../types/api.js";
 
-/**
- * Espejo de DEV_USER_IDS en apps/backend/src/auth/context.ts. El backend
- * no tiene login real todavía (Prompt 3 lo reemplaza), así que este
- * selector de rol es el único "auth" que existe hoy: persiste el rol
- * elegido en localStorage y lo manda como header x-role en cada request
- * (ver lib/apiClient.ts).
- */
-const DEV_USER_IDS: Record<Role, string> = {
-  ADMIN: "dev-admin",
-  TECNICO: "dev-tecnico",
-  VISUALIZADOR: "dev-visualizador",
-};
+export type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
-const DEV_USER_LABELS: Record<Role, string> = {
-  ADMIN: "Admin",
-  TECNICO: "Técnico",
-  VISUALIZADOR: "Visualizador",
-};
-
-const STORAGE_KEY = "netbot.devRole";
+interface PendingTotp {
+  /** "setup" = primer login de ADMIN/TECNICO sin 2FA todavía; "login" = ya tiene 2FA, falta el código. */
+  kind: "setup" | "login";
+  token: string;
+}
 
 interface AuthContextValue {
-  role: Role;
-  userId: string;
-  label: string;
-  setRole: (role: Role) => void;
+  status: AuthStatus;
+  user: PublicUser | null;
+  accessToken: string | null;
+  pendingTotp: PendingTotp | null;
+  totpSetup: Setup2faResponse | null;
+  login: (email: string, password: string) => Promise<void>;
+  submitTotpCode: (code: string) => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function loadInitialRole(): Role {
-  if (typeof window === "undefined") return "VISUALIZADOR";
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  const parsed = RoleSchema.safeParse(stored);
-  return parsed.success ? parsed.data : "VISUALIZADOR";
-}
-
+/**
+ * El access token vive SOLO en memoria (state de React), nunca en
+ * localStorage — mitiga robo por XSS. La sesión persiste entre reloads
+ * gracias a la cookie httpOnly de refresh: al montar, se intenta
+ * `POST /auth/refresh` (la cookie viaja sola) para restaurarla en
+ * silencio; si no hay cookie válida, queda "unauthenticated" y se muestra
+ * el login.
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [role, setRoleState] = useState<Role>(loadInitialRole);
+  const [status, setStatus] = useState<AuthStatus>("loading");
+  const [user, setUser] = useState<PublicUser | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [pendingTotp, setPendingTotp] = useState<PendingTotp | null>(null);
+  const [totpSetup, setTotpSetup] = useState<Setup2faResponse | null>(null);
 
-  const setRole = useCallback((next: Role) => {
-    setRoleState(next);
-    window.localStorage.setItem(STORAGE_KEY, next);
+  useEffect(() => {
+    authApi
+      .refresh()
+      .then((data) => {
+        setAccessToken(data.accessToken);
+        setUser(data.user);
+        setStatus("authenticated");
+      })
+      .catch(() => setStatus("unauthenticated"));
+  }, []);
+
+  const login = useCallback(async (email: string, password: string) => {
+    const data = await authApi.login(email, password);
+
+    if (data.status === "ok") {
+      setAccessToken(data.accessToken);
+      setUser(data.user);
+      setStatus("authenticated");
+      setPendingTotp(null);
+      setTotpSetup(null);
+      return;
+    }
+
+    if (data.status === "2fa_setup_required") {
+      setPendingTotp({ kind: "setup", token: data.setupToken });
+      const setup = await authApi.setup2fa(data.setupToken);
+      setTotpSetup(setup);
+      return;
+    }
+
+    // "2fa_required"
+    setPendingTotp({ kind: "login", token: data.loginToken });
+    setTotpSetup(null);
+  }, []);
+
+  const submitTotpCode = useCallback(
+    async (code: string) => {
+      if (!pendingTotp) throw new Error("No hay un login con 2FA pendiente");
+      const data =
+        pendingTotp.kind === "setup"
+          ? await authApi.confirm2fa(pendingTotp.token, code)
+          : await authApi.verifyLoginTotp(pendingTotp.token, code);
+
+      setAccessToken(data.accessToken);
+      setUser(data.user);
+      setStatus("authenticated");
+      setPendingTotp(null);
+      setTotpSetup(null);
+    },
+    [pendingTotp]
+  );
+
+  const logout = useCallback(async () => {
+    await authApi.logout().catch(() => {});
+    setAccessToken(null);
+    setUser(null);
+    setPendingTotp(null);
+    setTotpSetup(null);
+    setStatus("unauthenticated");
   }, []);
 
   return (
-    <AuthContext.Provider value={{ role, userId: DEV_USER_IDS[role], label: DEV_USER_LABELS[role], setRole }}>
+    <AuthContext.Provider
+      value={{ status, user, accessToken, pendingTotp, totpSetup, login, submitTotpCode, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -58,5 +113,3 @@ export function useAuth(): AuthContextValue {
   if (!ctx) throw new Error("useAuth debe usarse dentro de <AuthProvider>");
   return ctx;
 }
-
-export { DEV_USER_LABELS };

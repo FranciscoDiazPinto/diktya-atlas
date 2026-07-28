@@ -1,4 +1,27 @@
-import type { CsvRowResult, VlanPlan } from "@diktya-atlas/shared";
+import type { CsvRowResult, VlanPlan, Role } from "@diktya-atlas/shared";
+
+export interface PublicUser {
+  id: string;
+  email: string;
+  role: Role;
+  totpEnabled: boolean;
+}
+
+export type LoginResponse =
+  | { status: "ok"; accessToken: string; user: PublicUser }
+  | { status: "2fa_required"; loginToken: string }
+  | { status: "2fa_setup_required"; setupToken: string };
+
+export interface Setup2faResponse {
+  secret: string;
+  otpauthUrl: string;
+}
+
+export interface SessionResponse {
+  status: "ok";
+  accessToken: string;
+  user: PublicUser;
+}
 
 /**
  * Estas formas reflejan lo que las rutas del backend devuelven de verdad

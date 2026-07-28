@@ -39,7 +39,12 @@ const EnvSchema = z.object({
   EMAIL_SMTP_URL: z.string().optional(),
   GENERIC_WEBHOOK_URL: z.string().optional(),
 
-  JWT_SECRET: z.string().optional(),
+  JWT_SECRET: z.string().min(32, "JWT_SECRET debe tener al menos 32 caracteres"),
+  // Fallback de desarrollo: si no hay Bearer token, autentica leyendo el rol
+  // de x-role/x-user-id (ver auth/middleware.ts). Nunca en producción —
+  // el check de abajo lo fuerza en false ahí sin importar este valor.
+  ALLOW_DEV_ROLE_HEADER: z.coerce.boolean().default(true),
+  FRONTEND_ORIGIN: z.string().default("http://localhost:5173"),
 });
 
 function loadEnv() {
@@ -59,6 +64,12 @@ function loadEnv() {
         `UNIFI_MODE=live requiere: ${missing.join(", ")}`
       );
     }
+  }
+
+  // Ninguna variable de entorno puede reactivar el stub de header en
+  // producción, ni por error de config.
+  if (parsed.data.NODE_ENV === "production") {
+    parsed.data.ALLOW_DEV_ROLE_HEADER = false;
   }
 
   return parsed.data;

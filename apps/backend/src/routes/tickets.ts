@@ -1,9 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../db/client.js";
-import { getRequestContext } from "../auth/context.js";
 import { resolveTicket, reopenTicket } from "../services/ticket.service.js";
-import { HttpError, NotFoundError } from "../lib/errors.js";
+import { NotFoundError } from "../lib/errors.js";
+import { authenticate, requireRole } from "../auth/middleware.js";
 
 const ListQuerySchema = z.object({
   estado: z.enum(["ABIERTO", "EN_PROGRESO", "ESCALADO", "RESUELTO"]).optional(),
@@ -11,13 +11,9 @@ const ListQuerySchema = z.object({
   nodoAfectadoId: z.string().optional(),
 });
 
-function assertCanManageTickets(role: string) {
-  if (role === "VISUALIZADOR") {
-    throw new HttpError(403, "El rol VISUALIZADOR solo puede ver tickets en modo lectura");
-  }
-}
-
 export async function ticketRoutes(fastify: FastifyInstance) {
+  fastify.addHook("preHandler", authenticate);
+
   fastify.get("/tickets", async (request, reply) => {
     const query = ListQuerySchema.parse(request.query);
     const tickets = await prisma.ticket.findMany({
@@ -36,15 +32,19 @@ export async function ticketRoutes(fastify: FastifyInstance) {
     return reply.send(ticket);
   });
 
-  fastify.post<{ Params: { id: string } }>("/tickets/:id/resolve", async (request, reply) => {
-    const ctx = getRequestContext(request);
-    assertCanManageTickets(ctx.role);
-    return reply.send(await resolveTicket(request.params.id));
-  });
+  fastify.post<{ Params: { id: string } }>(
+    "/tickets/:id/resolve",
+    { preHandler: requireRole("ADMIN", "TECNICO") },
+    async (request, reply) => {
+      return reply.send(await resolveTicket(request.params.id));
+    }
+  );
 
-  fastify.post<{ Params: { id: string } }>("/tickets/:id/reopen", async (request, reply) => {
-    const ctx = getRequestContext(request);
-    assertCanManageTickets(ctx.role);
-    return reply.send(await reopenTicket(request.params.id));
-  });
+  fastify.post<{ Params: { id: string } }>(
+    "/tickets/:id/reopen",
+    { preHandler: requireRole("ADMIN", "TECNICO") },
+    async (request, reply) => {
+      return reply.send(await reopenTicket(request.params.id));
+    }
+  );
 }

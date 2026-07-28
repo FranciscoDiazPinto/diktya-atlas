@@ -1,10 +1,7 @@
-import type { Role } from "@diktya-atlas/shared";
-
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
 export interface ApiClientOptions {
-  role: Role;
-  userId: string;
+  accessToken: string | null;
 }
 
 export class ApiError extends Error {
@@ -19,7 +16,9 @@ export class ApiError extends Error {
 }
 
 function buildHeaders(opts: ApiClientOptions, extra?: Record<string, string>): HeadersInit {
-  return { "x-role": opts.role, "x-user-id": opts.userId, ...extra };
+  const headers: Record<string, string> = { ...extra };
+  if (opts.accessToken) headers.authorization = `Bearer ${opts.accessToken}`;
+  return headers;
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
@@ -37,20 +36,23 @@ async function handleResponse<T>(res: Response): Promise<T> {
 }
 
 /**
- * Fábrica de cliente REST atado al rol/usuario actual (ver
- * auth/AuthContext.tsx). Sin auth real todavía, el "login" es elegir un
- * rol en el selector — estos headers son lo único que el backend usa para
- * saber quién sos.
+ * Fábrica de cliente REST atado al access token actual (ver
+ * auth/AuthContext.tsx). `credentials: "include"` en todos los fetch para
+ * que la cookie httpOnly de refresh viaje — el access token va en
+ * Authorization, nunca en cookie.
  */
 export function createApiClient(opts: ApiClientOptions) {
   return {
     get: <T>(path: string): Promise<T> =>
-      fetch(`${API_BASE_URL}${path}`, { headers: buildHeaders(opts) }).then((r) => handleResponse<T>(r)),
+      fetch(`${API_BASE_URL}${path}`, { headers: buildHeaders(opts), credentials: "include" }).then((r) =>
+        handleResponse<T>(r)
+      ),
 
     post: <T>(path: string, body?: unknown): Promise<T> =>
       fetch(`${API_BASE_URL}${path}`, {
         method: "POST",
         headers: buildHeaders(opts, { "content-type": "application/json" }),
+        credentials: "include",
         body: body !== undefined ? JSON.stringify(body) : undefined,
       }).then((r) => handleResponse<T>(r)),
 
@@ -58,6 +60,7 @@ export function createApiClient(opts: ApiClientOptions) {
       fetch(`${API_BASE_URL}${path}`, {
         method: "POST",
         headers: buildHeaders(opts),
+        credentials: "include",
         body: form,
       }).then((r) => handleResponse<T>(r)),
   };
