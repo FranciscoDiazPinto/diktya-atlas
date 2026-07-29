@@ -5,6 +5,7 @@ import { ErrorState } from "../common/ErrorState.js";
 import { EmptyState } from "../common/EmptyState.js";
 import { Table, TableHeader, TableBody, TableRow, TableHead } from "../ui/Table.js";
 import { TicketRow } from "./TicketRow.js";
+import { CreateTicketForm } from "./CreateTicketForm.js";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../ui/Select.js";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/Card.js";
 
@@ -61,7 +62,9 @@ export function TicketsView() {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-col gap-3">
+        <CreateTicketForm />
+
         {isLoading ? (
           <LoadingState label="Cargando tickets…" />
         ) : isError ? (

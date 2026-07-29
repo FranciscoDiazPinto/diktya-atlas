@@ -7,6 +7,7 @@ export interface CreateTicketInput {
   descripcion: string;
   severidad: ApiAlertSeverity;
   nodoAfectadoId?: string;
+  eventDeploymentId?: string;
 }
 
 export function useCreateTicket() {
