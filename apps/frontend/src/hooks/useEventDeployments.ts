@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApiClient } from "./useApiClient.js";
-import type { ApiEventDeployment, ApiEventDeploymentDetail } from "../types/api.js";
+import type { ApiEventDeployment, ApiEventDeploymentDetail, EventReport } from "../types/api.js";
 
 export function useEventDeployments(nombre?: string) {
   const api = useApiClient();
@@ -21,7 +21,8 @@ export function useEventDeployment(eventId: string | undefined) {
 
 export interface CreateEventDeploymentInput {
   nombre: string;
-  fecha: string;
+  fechaInicio: string;
+  fechaFin: string;
 }
 
 export function useCreateEventDeployment() {
@@ -30,5 +31,14 @@ export function useCreateEventDeployment() {
   return useMutation({
     mutationFn: (body: CreateEventDeploymentInput) => api.post<ApiEventDeployment>("/events", body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["events"] }),
+  });
+}
+
+export function useEventReport(eventId: string | undefined) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ["event-report", eventId ?? ""],
+    queryFn: () => api.get<EventReport>(`/events/${eventId}/report`),
+    enabled: false,
   });
 }

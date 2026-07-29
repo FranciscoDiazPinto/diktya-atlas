@@ -17,6 +17,7 @@ const CreateTicketBodySchema = z.object({
   descripcion: z.string().min(1),
   severidad: z.enum(["INFO", "ADVERTENCIA", "CRITICO"]),
   nodoAfectadoId: z.string().optional(),
+  eventDeploymentId: z.string().optional(),
 });
 
 export async function ticketRoutes(fastify: FastifyInstance) {

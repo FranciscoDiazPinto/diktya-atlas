@@ -3,7 +3,8 @@ import { NotFoundError } from "../lib/errors.js";
 
 export interface CreateEventDeploymentInput {
   nombre: string;
-  fecha: Date;
+  fechaInicio: Date;
+  fechaFin: Date;
 }
 
 export async function createEventDeployment(input: CreateEventDeploymentInput) {
@@ -22,6 +23,6 @@ export async function getEventDeployment(id: string) {
 export async function listEventDeployments(nombre?: string) {
   return prisma.eventDeployment.findMany({
     where: nombre ? { nombre: { contains: nombre, mode: "insensitive" } } : undefined,
-    orderBy: { fecha: "desc" },
+    orderBy: { fechaInicio: "desc" },
   });
 }

@@ -164,17 +164,21 @@ model Ticket {
   nodoAfectadoId    String?
   vlanReservationId String?
   asignadoAId       String?
+  // Opcional a propósito: no todo ticket ocurre durante un evento (ej. mantenimiento de oficina).
+  eventDeploymentId String?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
   nodoAfectado    NetworkNode?     @relation(fields: [nodoAfectadoId], references: [id], onDelete: SetNull)
   vlanReservation VlanReservation? @relation(fields: [vlanReservationId], references: [id], onDelete: SetNull)
   asignadoA       User?            @relation("TicketAssignee", fields: [asignadoAId], references: [id], onDelete: SetNull)
+  eventDeployment EventDeployment? @relation(fields: [eventDeploymentId], references: [id], onDelete: SetNull)
   alerts          Alert[]
   eventos         TicketEvent[]
 
   @@index([estado])
   @@index([severidad])
+  @@index([eventDeploymentId])
   @@map("tickets")
 }
 
@@ -255,14 +259,17 @@ model Venue {
 }
 
 model EventDeployment {
-  id        String           @id @default(cuid())
-  nombre    String
-  fecha     DateTime
-  estado    DeploymentEstado @default(PLANIFICACION)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  id          String           @id @default(cuid())
+  nombre      String
+  // Rango, no fecha única: un evento real (ej. Expomin) puede durar varios días.
+  fechaInicio DateTime
+  fechaFin    DateTime
+  estado      DeploymentEstado @default(PLANIFICACION)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
-  zonas EventZone[]
+  zonas   EventZone[]
+  tickets Ticket[]
 
   @@map("event_deployments")
 }

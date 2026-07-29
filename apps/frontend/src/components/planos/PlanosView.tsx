@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { EventsSidebar } from "./EventsSidebar.js";
 import { ZonesPanel } from "./ZonesPanel.js";
 import { ZonePlanView } from "./ZonePlanView.js";
+import { EventReportPanel } from "./EventReportPanel.js";
 import { EmptyState } from "../common/EmptyState.js";
 import { Card, CardContent } from "../ui/Card.js";
 
@@ -54,6 +55,8 @@ export function PlanosView() {
                 />
               </CardContent>
             </Card>
+
+            <EventReportPanel key={selectedEventId} eventId={selectedEventId} />
 
             {selectedZoneId ? (
               <ZonePlanView eventId={selectedEventId} zoneId={selectedZoneId} />

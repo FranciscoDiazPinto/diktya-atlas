@@ -31,7 +31,11 @@ describe("coverage.service", () => {
   beforeAll(async () => {
     const venue = await createVenue({ nombre: `venue-test-${randomUUID()}`, planFilePath: "test.pdf" });
     venueId = venue.id;
-    const event = await createEventDeployment({ nombre: "evento-test", fecha: new Date() });
+    const event = await createEventDeployment({
+      nombre: "evento-test",
+      fechaInicio: new Date(),
+      fechaFin: new Date(),
+    });
     eventId = event.id;
     const zone = await createEventZone({ eventDeploymentId: eventId, venueId, nombreZona: "Zona A" });
     zoneId = zone.id;

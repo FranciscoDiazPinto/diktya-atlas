@@ -8,6 +8,8 @@ export interface CreateTicketInput {
   severidad: AlertSeverity;
   nodoAfectadoId?: string;
   vlanReservationId?: string;
+  // Opcional: solo se completa cuando el ticket se crea en contexto de un evento (para reportería).
+  eventDeploymentId?: string;
 }
 
 export async function createTicket(input: CreateTicketInput) {
@@ -18,6 +20,7 @@ export async function createTicket(input: CreateTicketInput) {
       severidad: input.severidad,
       nodoAfectadoId: input.nodoAfectadoId,
       vlanReservationId: input.vlanReservationId,
+      eventDeploymentId: input.eventDeploymentId,
     },
   });
   await prisma.ticketEvent.create({

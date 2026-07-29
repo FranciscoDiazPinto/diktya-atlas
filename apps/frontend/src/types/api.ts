@@ -211,10 +211,37 @@ export interface ApiVenue {
 export interface ApiEventDeployment {
   id: string;
   nombre: string;
-  fecha: string;
+  fechaInicio: string;
+  fechaFin: string;
   estado: DeploymentEstado;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface EventReportZone {
+  id: string;
+  nombreZona: string;
+  venue: string;
+  calibrada: boolean;
+  totalAps: number;
+  apsPorModelo: Partial<Record<ApModel, number>>;
+}
+
+export interface EventReport {
+  evento: {
+    id: string;
+    nombre: string;
+    fechaInicio: string;
+    fechaFin: string;
+    estado: DeploymentEstado;
+  };
+  zonas: EventReportZone[];
+  tickets: {
+    total: number;
+    porSeveridad: Record<ApiAlertSeverity, number>;
+    porEstado: Record<ApiTicketStatus, number>;
+    tiempoResolucionPromedioMin: number | null;
+  };
 }
 
 export interface ApiEventDeploymentDetail extends ApiEventDeployment {

@@ -22,13 +22,15 @@ export function EventsSidebar({
   const createEvent = useCreateEventDeployment();
 
   const [nombre, setNombre] = useState("");
-  const [fecha, setFecha] = useState("");
+  const [fechaInicio, setFechaInicio] = useState("");
+  const [fechaFin, setFechaFin] = useState("");
 
   async function handleCreate() {
-    if (!nombre.trim() || !fecha) return;
-    const event = await createEvent.mutateAsync({ nombre: nombre.trim(), fecha });
+    if (!nombre.trim() || !fechaInicio || !fechaFin) return;
+    const event = await createEvent.mutateAsync({ nombre: nombre.trim(), fechaInicio, fechaFin });
     setNombre("");
-    setFecha("");
+    setFechaInicio("");
+    setFechaFin("");
     onSelectEvent(event.id);
   }
 
@@ -59,7 +61,8 @@ export function EventsSidebar({
                   >
                     {ev.nombre}
                     <span className="block text-xs text-slate-400">
-                      {new Date(ev.fecha).toLocaleDateString("es-CL")}
+                      {new Date(ev.fechaInicio).toLocaleDateString("es-CL")}
+                      {ev.fechaFin !== ev.fechaInicio && ` – ${new Date(ev.fechaFin).toLocaleDateString("es-CL")}`}
                     </span>
                   </button>
                 </li>
@@ -75,13 +78,31 @@ export function EventsSidebar({
                 placeholder="Nombre del evento"
                 className="rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-900"
               />
-              <input
-                type="date"
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-                className="rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-900"
-              />
-              <Button size="sm" onClick={handleCreate} disabled={createEvent.isPending || !nombre.trim() || !fecha}>
+              <div className="flex gap-2">
+                <label className="flex flex-1 flex-col gap-1 text-[10px] text-slate-500">
+                  Desde
+                  <input
+                    type="date"
+                    value={fechaInicio}
+                    onChange={(e) => setFechaInicio(e.target.value)}
+                    className="rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-900"
+                  />
+                </label>
+                <label className="flex flex-1 flex-col gap-1 text-[10px] text-slate-500">
+                  Hasta
+                  <input
+                    type="date"
+                    value={fechaFin}
+                    onChange={(e) => setFechaFin(e.target.value)}
+                    className="rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-900"
+                  />
+                </label>
+              </div>
+              <Button
+                size="sm"
+                onClick={handleCreate}
+                disabled={createEvent.isPending || !nombre.trim() || !fechaInicio || !fechaFin}
+              >
                 <Plus className="h-3.5 w-3.5" /> Nuevo evento
               </Button>
             </div>
