@@ -1,6 +1,6 @@
 ---
 tags: [atlas, netbot, documentacion]
-updated: 2026-07-29
+updated: 2026-07-30
 ---
 
 # Diktya Atlas — NetBot
@@ -93,6 +93,19 @@ dedicada.
   (candidato: Mac Mini M4 Pro con suficiente RAM unificada; modelo recomendado: Qwen2.5
   14B/32B-Instruct por tool-calling nativo confiable en español).
 - Detección de stands por visión: diseñado, no implementado (ver [[Detección de stands por vision]]).
+- **UniFi WLANs/nodos/reboot: migrados a la Integration API real y validados contra hardware real
+  (2026-07-30)** — ver [[OPNsense y UniFi]]. `UNIFI_MODE` sigue en `mock` — pendiente pasar a
+  `live` cuando se llegue al milestone de revisión de seguridad (ver [[Infraestructura Real]]).
+- **Notificaciones Telegram: corregidas y probadas en real (2026-07-30)** — tenían un bug real
+  (chat_id hardcodeado a un placeholder). Ahora requiere `TELEGRAM_BOT_TOKEN` +
+  `TELEGRAM_CHAT_ID` juntas.
+- **Auto-remediación por criticidad: diseño conceptual, sin implementar** (ej. AP offline → NetBot
+  intenta resetear/re-adoptar antes de escalar a técnico) — ver [[Plataforma ATLAS (Codex)]] §
+  Decisión, incluye qué falta construir.
+- Existe una plataforma separada e independiente ("ATLAS", de Codex) operando sobre la misma
+  infraestructura real — **no relacionada con este software**, ver
+  [[Plataforma ATLAS (Codex)]] antes de asumir que algo de observabilidad/alertas ya está resuelto
+  por otro lado.
 
 ## Convenciones del repo
 

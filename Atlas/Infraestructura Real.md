@@ -1,6 +1,6 @@
 ---
 tags: [atlas, infraestructura, diktya]
-updated: 2026-07-29
+updated: 2026-07-30
 ---
 
 # Infraestructura real de Diktya Atlas
@@ -40,8 +40,11 @@ Operador de red para eventos móviles (expos, ferias). Activos **permanentes**:
 
 ## Gobernanza del proyecto
 
-- Yo (Claude) opero de forma autónoma en desarrollo y documentación.
-- "Codex" (GPT) es un auditor externo, siempre supervisado por Lucas.
+- Yo (Claude) opero de forma autónoma en desarrollo y documentación de **NetBot** (este repo).
+- "Codex" (GPT), supervisado por Lucas, no es solo auditor — construye y opera **ATLAS**, una
+  plataforma separada (API + colector + Grafana + bot Telegram, ya en producción) sobre esta
+  misma infraestructura. Ver [[Plataforma ATLAS (Codex)]] — descubierto recién el 2026-07-30, no
+  relacionado con NetBot por decisión explícita.
 - Eventos reales requieren un milestone de revisión de seguridad antes del "primer evento real".
 - La fase de pruebas corre hasta septiembre (2026).
 
@@ -55,12 +58,21 @@ Operador de red para eventos móviles (expos, ferias). Activos **permanentes**:
   operativo sin confirmar con Lucas primero. El camino *diseñado* sigue siendo WireGuard
   (bloqueado por Starlink sin datos) — ver [[Rutas de Red]] para el detalle completo de ambos
   caminos.
+- **Re-confirmado 2026-07-30, solo lectura** (igual que antes, deliberado — sin escrituras contra
+  infra real todavía): mismos 7 dispositivos, todos ONLINE. Además: 47 `Networks`, 21 clientes
+  conectados reales, 1 WiFi Broadcast real (`DIKTYA-MNG`). NetBot migró su código de escritura de
+  VLANs (`writeWifiNetwork`) a esta misma API, pero esa escritura solo se probó con mocks — nunca
+  se ejecutó contra el UDM real. Ver [[OPNsense y UniFi]] para el detalle técnico.
 - **API key de solo lectura generada y probada** (2026-07-29, guardada en `apps/backend/.env`
   como `UNIFI_API_KEY`, nunca en este repo/bóveda) — login confirmado contra la API de
   integraciones de UniFi OS (`/proxy/network/integration/v1/...`, header `X-API-KEY`). Site único
   `Default`. **7 dispositivos, todos ONLINE**: `DIKTYA-EFG-01` (gateway), `DIKTYA-SW-BB` (USW Pro
   Max 24 PoE), `DIKTYA-SW-AA` (USW Pro Max 48 PoE), `DIKTYA-CORE-FO-AA`/`DIKTYA-CORE-FO-BB` (USW
   Pro Aggregation, fibra), `UPS 2U`, `U6 IW` (el único AP WiFi propiamente dicho).
+  **Pendiente de confirmar**: no está verificado si este key tiene permisos de escritura a nivel
+  UniFi o si fue creado explícitamente como solo-lectura — importa para cuando se pruebe
+  `writeWifiNetwork`/reboot contra el UDM real por primera vez, podría devolver 403 aunque el
+  código esté bien.
 - **OPNsense real sí es alcanzable** desde este equipo vía ZeroTier (ping OK a `10.71.111.101`),
   con una API key de solo lectura ya disponible — usada solo para diagnóstico puntual, nunca para
   escribir.
@@ -69,3 +81,5 @@ Operador de red para eventos móviles (expos, ferias). Activos **permanentes**:
 
 - [[Proyecto Atlas]] — el software (NetBot) que opera sobre esta infraestructura
 - [[Rutas de Red]] — tabla completa de rutas documentadas (ZeroTier, WireGuard, OPNsense, Proxmox)
+- [[Plataforma ATLAS (Codex)]] — otro software, de Codex, que también opera sobre esta misma
+  infraestructura — independiente de NetBot

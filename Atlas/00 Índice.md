@@ -1,6 +1,6 @@
 ---
 tags: [atlas, indice]
-updated: 2026-07-29
+updated: 2026-07-30
 ---
 
 # Índice — bóveda Atlas
@@ -22,8 +22,11 @@ falta leer todo el vault para tener contexto.
 
 - [[Infraestructura Real]] — componentes core (OPNsense, UniFi, Proxmox, MikroTik Chateau),
   reglas de "no tocar", gobernanza, estado actual de bloqueos.
-- [[Rutas de Red]] — tabla completa de rutas (ZeroTier, WireGuard, OPNsense, Proxmox) + por qué
-  UniFi real no es alcanzable hoy.
+- [[Rutas de Red]] — tabla completa de rutas (ZeroTier, WireGuard, OPNsense, Proxmox) y el camino
+  de facto (no el diseñado) para llegar a UniFi real hoy.
+- [[Plataforma ATLAS (Codex)]] — sistema aparte, ya operativo, construido por Codex sobre la misma
+  infraestructura real. No confundir con NetBot — leer antes de asumir que algo de
+  observabilidad/alertas/auto-remediación ya está resuelto.
 
 ## Convención
 
