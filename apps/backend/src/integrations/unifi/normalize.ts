@@ -7,6 +7,7 @@ import type { NetworkNode, WifiNetwork, Alert, NodeStatus } from "../../domain/n
  */
 export interface RawUnifiDevice {
   _id: string;
+  mac: string;
   name?: string;
   model?: string;
   state: number; // 1 = connected, 0 = disconnected, 4 = adopting (convención Ubiquiti)

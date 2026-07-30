@@ -24,18 +24,12 @@ export class LockAcquisitionError extends Error {
 }
 
 /**
- * Ejecuta `fn` bajo el lock distribuido `write-lock:{sitio}:{vlanId}`.
- * Cualquier escritura real en UniFi/OPNsense/Proxmox debe pasar por acá,
- * sin importar qué worker la origina — es la única forma de garantizar
- * "un solo dueño por recurso a la vez" entre workers concurrentes.
+ * Ejecuta `fn` bajo un lock distribuido por `key`. Cualquier escritura
+ * real en UniFi/OPNsense/Proxmox debe pasar por acá, sin importar qué
+ * worker la origina — es la única forma de garantizar "un solo dueño por
+ * recurso a la vez" entre workers/requests concurrentes.
  */
-export async function withWriteLock<T>(
-  sitio: string,
-  vlanId: number,
-  fn: () => Promise<T>,
-  ttlMs = 30_000
-): Promise<T> {
-  const key = writeLockKey(sitio, vlanId);
+export async function withLock<T>(key: string, fn: () => Promise<T>, ttlMs = 30_000): Promise<T> {
   try {
     return await redlock.using([key], ttlMs, async () => fn());
   } catch (err) {
@@ -44,4 +38,13 @@ export async function withWriteLock<T>(
     }
     throw err;
   }
+}
+
+export async function withWriteLock<T>(
+  sitio: string,
+  vlanId: number,
+  fn: () => Promise<T>,
+  ttlMs = 30_000
+): Promise<T> {
+  return withLock(writeLockKey(sitio, vlanId), fn, ttlMs);
 }

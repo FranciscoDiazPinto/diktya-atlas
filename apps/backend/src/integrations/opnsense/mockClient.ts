@@ -44,4 +44,8 @@ export class MockOpnsenseClient implements OpnsenseClient {
   async writeWifiNetwork(_input: WriteWifiNetworkInput): Promise<WifiNetwork> {
     throw new Error("OpnsenseClient.writeWifiNetwork no aplica — OPNsense no administra SSIDs, eso es UniFi.");
   }
+
+  async rebootNode(_nodeId: string): Promise<void> {
+    throw new Error("OpnsenseClient.rebootNode no aplica — reinicio de APs es dominio de UniFi, no OPNsense.");
+  }
 }

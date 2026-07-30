@@ -51,8 +51,9 @@ async function triageAlert(alertId: string): Promise<void> {
   const offlineMinutos = alert.node?.ultimaVezVisto
     ? (Date.now() - alert.node.ultimaVezVisto.getTime()) / 60_000
     : 0;
+  const offlineCritico = offlineMinutos >= OFFLINE_CRITICAL_MINUTES;
 
-  if (offlineMinutos >= OFFLINE_CRITICAL_MINUTES) {
+  if (offlineCritico) {
     severidad = "CRITICO";
   } else {
     try {
@@ -64,12 +65,17 @@ async function triageAlert(alertId: string): Promise<void> {
     }
   }
 
-  // Auto-remediación de un AP caído (reintentar adopción) queda fuera de
-  // alcance de esta primera pasada: worker-remediation por ahora solo
-  // ejecuta aplicación de VLAN. Este flujo siempre termina en ticket.
+  // El AP nunca se reinicia solo desde acá — worker-remediation por ahora
+  // solo ejecuta aplicación de VLAN. Lo único que hace este flujo es
+  // sugerir la acción en la descripción del ticket; un técnico la confirma
+  // manualmente desde /red (POST /network/nodes/:id/reboot).
+  const descripcion = offlineCritico
+    ? `${alert.mensaje}\n\nSugerencia: lleva ${Math.round(offlineMinutos)} min sin responder — considerá reiniciarlo desde la vista Red (acción manual, requiere confirmación).`
+    : alert.mensaje;
+
   const ticket = await createTicket({
     titulo: `Alerta ${severidad} en ${alert.sitio}`,
-    descripcion: alert.mensaje,
+    descripcion,
     severidad,
     nodoAfectadoId: alert.nodeId ?? undefined,
   });

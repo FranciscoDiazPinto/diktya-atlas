@@ -64,6 +64,13 @@ export class MockUnifiClient implements UnifiClient {
     return sitio ? this.alerts.filter((a) => a.sitio === sitio) : this.alerts;
   }
 
+  /** Simula el reinicio: pasa a "adopting" — como un AP real, tarda en volver a reportar "online". */
+  async rebootNode(nodeId: string): Promise<void> {
+    const node = this.nodes.get(nodeId);
+    if (!node) throw new Error(`Nodo ${nodeId} no encontrado`);
+    this.nodes.set(nodeId, { ...node, status: "adopting" });
+  }
+
   async writeWifiNetwork(input: WriteWifiNetworkInput): Promise<WifiNetwork> {
     const existing = this.wifiNetworks.get(this.key(input.sitio, input.ssid));
     const written: WifiNetwork = {

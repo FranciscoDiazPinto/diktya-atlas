@@ -101,6 +101,24 @@ export class UnifiLiveClient implements UnifiClient {
     return alarms.map(normalizeAlert);
   }
 
+  /**
+   * La API clásica de UniFi pide el MAC del dispositivo, no su `_id`
+   * (`normalizeNode` no expone MAC hacia el resto del sistema a propósito
+   * — es un detalle del proveedor, no del dominio — así que se busca acá).
+   */
+  async rebootNode(nodeId: string): Promise<void> {
+    const site = this.config.site;
+    const devices = await this.request<RawUnifiDevice[]>(`/api/s/${site}/stat/device`);
+    const device = devices.find((d) => d._id === nodeId);
+    if (!device) {
+      throw new Error(`Dispositivo ${nodeId} no encontrado en UniFi (site ${site})`);
+    }
+    await this.request(`/api/s/${site}/cmd/devmgr`, {
+      method: "POST",
+      body: JSON.stringify({ cmd: "restart", mac: device.mac }),
+    });
+  }
+
   async writeWifiNetwork(input: WriteWifiNetworkInput): Promise<WifiNetwork> {
     const site = input.sitio;
     const existing = await this.request<RawUnifiWlan[]>(`/api/s/${site}/rest/wlanconf`);

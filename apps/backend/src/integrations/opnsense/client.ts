@@ -32,4 +32,7 @@ export class OpnsenseClientStub implements OpnsenseClient {
   async writeWifiNetwork() {
     return notImplemented("writeWifiNetwork");
   }
+  async rebootNode() {
+    return notImplemented("rebootNode");
+  }
 }
