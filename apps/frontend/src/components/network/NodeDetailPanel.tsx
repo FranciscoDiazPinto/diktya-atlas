@@ -9,6 +9,7 @@ import { ErrorState } from "../common/ErrorState.js";
 import { EmptyState } from "../common/EmptyState.js";
 import { SeverityBadge } from "../common/SeverityBadge.js";
 import { NodeStatusBadge } from "./NodeStatusBadge.js";
+import { DeviceTypeIcon } from "./DeviceTypeIcon.js";
 import { Button } from "../ui/Button.js";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../ui/Card.js";
 
@@ -36,8 +37,20 @@ export function NodeDetailPanel({ nodeId }: { nodeId?: string }) {
   const diagnose = useDiagnoseNode();
   const reboot = useRebootNode();
 
-  function handleReboot(id: string, nombre: string) {
-    if (confirm(`¿Reiniciar "${nombre}"? Esto va a desconectar momentáneamente a todos los clientes conectados a este AP.`)) {
+  // Gateway/switch reinician toda la red que pasa por ellos, no solo los
+  // clientes WiFi de un AP — la advertencia tiene que reflejar eso, sobre
+  // todo ahora que el reboot es real (UNIFI_MODE=live).
+  const REBOOT_WARNING: Record<string, string> = {
+    AP: "va a desconectar momentáneamente a los clientes WiFi conectados a este AP",
+    SWITCH: "va a cortar la conectividad de TODO lo cableado a este switch mientras reinicia",
+    GATEWAY: "va a cortar la conectividad de TODO el sitio (internet + red interna) mientras reinicia",
+    UPS: "puede interrumpir la alimentación de respaldo de los equipos conectados",
+    OTRO: "puede interrumpir la conectividad de los equipos que dependen de este dispositivo",
+  };
+
+  function handleReboot(id: string, nombre: string, tipo: string) {
+    const impacto = REBOOT_WARNING[tipo] ?? REBOOT_WARNING.OTRO;
+    if (confirm(`¿Reiniciar "${nombre}"? Esto ${impacto}.`)) {
       reboot.mutate(id);
     }
   }
@@ -53,7 +66,10 @@ export function NodeDetailPanel({ nodeId }: { nodeId?: string }) {
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>{node.nombre}</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <DeviceTypeIcon tipo={node.tipoDispositivo} />
+            {node.nombre}
+          </CardTitle>
           <div className="flex items-center gap-2">
             {canDiagnose && (
               <>
@@ -64,11 +80,11 @@ export function NodeDetailPanel({ nodeId }: { nodeId?: string }) {
                 <Button
                   size="sm"
                   variant="destructive"
-                  onClick={() => handleReboot(node.id, node.nombre)}
+                  onClick={() => handleReboot(node.id, node.nombre, node.tipoDispositivo)}
                   disabled={reboot.isPending}
                 >
                   <Power className="h-3.5 w-3.5" />
-                  Reiniciar AP
+                  Reiniciar
                 </Button>
               </>
             )}

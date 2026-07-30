@@ -32,6 +32,7 @@ export interface SessionResponse {
  */
 
 export type ApiNodeStatus = "ONLINE" | "OFFLINE" | "ADOPTING" | "UNKNOWN";
+export type ApiDeviceType = "AP" | "SWITCH" | "GATEWAY" | "UPS" | "OTRO";
 export type ApiAlertSeverity = "INFO" | "ADVERTENCIA" | "CRITICO";
 export type ApiTicketStatus = "ABIERTO" | "EN_PROGRESO" | "ESCALADO" | "RESUELTO";
 export type ApiTicketEventType =
@@ -48,6 +49,7 @@ export interface ApiNetworkNode {
   sitio: string;
   nombre: string;
   modelo: string | null;
+  tipoDispositivo: ApiDeviceType;
   status: ApiNodeStatus;
   senalDbm: number | null;
   clientesConectados: number;
@@ -121,6 +123,7 @@ export interface OpnsenseNode {
   sitio: string;
   nombre: string;
   modelo?: string;
+  tipoDispositivo: ApiDeviceType;
   status: "online" | "offline" | "adopting" | "unknown";
   senalDbm?: number;
   clientesConectados: number;

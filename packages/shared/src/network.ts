@@ -9,11 +9,15 @@ import { z } from "zod";
 export const NodeStatusSchema = z.enum(["online", "offline", "adopting", "unknown"]);
 export type NodeStatus = z.infer<typeof NodeStatusSchema>;
 
+export const DeviceTypeSchema = z.enum(["AP", "SWITCH", "GATEWAY", "UPS", "OTRO"]);
+export type DeviceType = z.infer<typeof DeviceTypeSchema>;
+
 export const NetworkNodeSchema = z.object({
   id: z.string(),
   sitio: z.string(),
   nombre: z.string(),
   modelo: z.string().optional(),
+  tipoDispositivo: DeviceTypeSchema.default("OTRO"),
   status: NodeStatusSchema,
   senalDbm: z.number().optional(),
   clientesConectados: z.number().int().nonnegative(),

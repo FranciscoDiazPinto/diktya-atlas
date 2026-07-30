@@ -1,4 +1,4 @@
-import type { NetworkNode, WifiNetwork, Alert, NodeStatus } from "../../domain/network.js";
+import type { NetworkNode, WifiNetwork, Alert, NodeStatus, DeviceType } from "../../domain/network.js";
 import type { UnifiOsWifiBroadcastOverview, UnifiOsDevice, UnifiOsDeviceLatestStatistics } from "../unifiOs/client.js";
 
 /**
@@ -36,6 +36,23 @@ function mapDeviceState(state: string): NodeStatus {
     default:
       return "unknown";
   }
+}
+
+/**
+ * `features` no siempre alcanza para clasificar — dos casos confirmados
+ * contra hardware real: un UPS reportó `features: ["switching"]` (no hay
+ * valor "ups" en el enum de la API), y el gateway (`Enterprise Fortress
+ * Gateway`) reportó `features: []` vacío del todo. Por eso el modelo entra
+ * primero como caso especial para ambos; el resto se clasifica por feature.
+ */
+function mapDeviceType(device: UnifiOsDevice): DeviceType {
+  const model = device.model.toUpperCase();
+  if (model.includes("UPS")) return "UPS";
+  if (model.includes("GATEWAY") || model.includes("EFG") || model.includes("UDM")) return "GATEWAY";
+  if (device.features.includes("gateway")) return "GATEWAY";
+  if (device.features.includes("accessPoint")) return "AP";
+  if (device.features.includes("switching")) return "SWITCH";
+  return "OTRO";
 }
 
 function mapBand(raw: string): "2.4GHz" | "5GHz" | "6GHz" | null {
@@ -84,6 +101,7 @@ export function normalizeIntegrationDevice(
     sitio,
     nombre: device.name,
     modelo: device.model,
+    tipoDispositivo: mapDeviceType(device),
     status: mapDeviceState(device.state),
     clientesConectados,
     uptimeSegundos: stats?.uptimeSec,

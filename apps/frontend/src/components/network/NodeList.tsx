@@ -1,5 +1,6 @@
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../ui/Table.js";
 import { NodeStatusBadge } from "./NodeStatusBadge.js";
+import { DeviceTypeIcon } from "./DeviceTypeIcon.js";
 import type { ApiNetworkNode } from "../../types/api.js";
 
 function formatUptime(seconds: number | null): string {
@@ -22,6 +23,7 @@ export function NodeList({
     <Table>
       <TableHeader>
         <TableRow>
+          <TableHead className="w-8"></TableHead>
           <TableHead>Nodo</TableHead>
           <TableHead>Sitio</TableHead>
           <TableHead>Estado</TableHead>
@@ -41,6 +43,9 @@ export function NodeList({
                 : "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50"
             }
           >
+            <TableCell>
+              <DeviceTypeIcon tipo={node.tipoDispositivo} />
+            </TableCell>
             <TableCell className="font-medium text-slate-900 dark:text-slate-100">{node.nombre}</TableCell>
             <TableCell>{node.sitio}</TableCell>
             <TableCell>

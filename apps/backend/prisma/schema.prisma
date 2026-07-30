@@ -59,12 +59,21 @@ enum NodeStatus {
   UNKNOWN
 }
 
+enum DeviceType {
+  AP
+  SWITCH
+  GATEWAY
+  UPS
+  OTRO
+}
+
 model NetworkNode {
   id                 String     @id @default(cuid())
   externalId         String     @unique // id crudo del proveedor (UniFi/OPNsense)
   sitio              String
   nombre             String
   modelo             String?
+  tipoDispositivo    DeviceType @default(OTRO)
   status             NodeStatus @default(UNKNOWN)
   senalDbm           Int?
   clientesConectados Int        @default(0)

@@ -10,9 +10,11 @@ export {
   AlertSchema,
   AlertSeveritySchema,
   NodeStatusSchema,
+  DeviceTypeSchema,
   type NetworkNode,
   type WifiNetwork,
   type Alert,
   type AlertSeverity,
   type NodeStatus,
+  type DeviceType,
 } from "@diktya-atlas/shared";
