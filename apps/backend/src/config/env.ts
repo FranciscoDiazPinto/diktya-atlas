@@ -70,9 +70,12 @@ function loadEnv() {
 
   if (parsed.data.UNIFI_MODE === "live") {
     // UNIFI_OS_HOST/UNIFI_API_KEY ya no son solo del panel /infra de solo
-    // lectura: writeWifiNetwork (integrations/unifi/liveClient.ts) los usa
-    // para escribir WLANs vía la Integration API.
-    const missing = ["UNIFI_HOST", "UNIFI_USERNAME", "UNIFI_PASSWORD", "UNIFI_OS_HOST", "UNIFI_API_KEY"].filter(
+    // lectura: nodos/WLANs/reboot (integrations/unifi/liveClient.ts) los usan
+    // vía la Integration API. UNIFI_HOST/USERNAME/PASSWORD (API clásica) NO
+    // son requeridos acá a propósito — solo los usa listAlerts, que nada
+    // llama hoy, y no hay cuenta clásica creada en el UDM real (decisión
+    // explícita, ver Atlas/Infraestructura Real.md).
+    const missing = ["UNIFI_OS_HOST", "UNIFI_API_KEY"].filter(
       (key) => !parsed.data[key as keyof typeof parsed.data]
     );
     if (missing.length > 0) {

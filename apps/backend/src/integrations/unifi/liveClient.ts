@@ -12,13 +12,21 @@ import type { UnifiOsClient } from "../unifiOs/client.js";
 import { env } from "../../config/env.js";
 
 export interface UnifiLiveClientConfig {
-  host: string;
+  /**
+   * Credenciales clásicas — opcionales a propósito. Usadas solo por
+   * `listAlerts` (la única función que sigue en la API clásica, ver
+   * comentario de clase); nada en la app llama a esa función hoy. No se
+   * creó una cuenta local clásica en el UDM real por decisión explícita
+   * (ver Atlas/Infraestructura Real.md) — exigirlas bloquearía
+   * UNIFI_MODE=live por completo para una función que nunca se usa.
+   */
+  host?: string;
   port?: number;
-  username: string;
-  password: string;
+  username?: string;
+  password?: string;
   site: string;
   verifyTls: boolean;
-  /** Credenciales de la Integration API (X-API-KEY) — usadas solo para WLANs. */
+  /** Credenciales de la Integration API (X-API-KEY) — usadas para WLANs, nodos y reboot. */
   integrationHost: string;
   integrationApiKey: string;
   integrationVerifyTls: boolean;
@@ -47,6 +55,9 @@ export class UnifiLiveClient implements UnifiClient {
 
   constructor(private config: UnifiLiveClientConfig) {
     const port = config.port ?? 443;
+    // Puede quedar apuntando a "https://undefined:443" si no hay host clásico
+    // configurado — inofensivo: nada lo usa hasta que se llame listAlerts,
+    // que falla explícito en login() antes de intentar el fetch.
     this.baseUrl = `https://${config.host}:${port}`;
   }
 
@@ -82,6 +93,11 @@ export class UnifiLiveClient implements UnifiClient {
   }
 
   private async login(): Promise<void> {
+    if (!this.config.host || !this.config.username || !this.config.password) {
+      throw new Error(
+        "listAlerts requiere credenciales clásicas (UNIFI_HOST/UNIFI_USERNAME/UNIFI_PASSWORD), no configuradas — decisión explícita de no crear esa cuenta en el UDM real, ver Atlas/Infraestructura Real.md"
+      );
+    }
     const res = await fetch(`${this.baseUrl}/api/login`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -264,12 +280,11 @@ export class UnifiLiveClient implements UnifiClient {
 }
 
 export function createUnifiLiveClientFromEnv(): UnifiLiveClient {
-  if (!env.UNIFI_HOST || !env.UNIFI_USERNAME || !env.UNIFI_PASSWORD) {
-    throw new Error("UNIFI_MODE=live requiere UNIFI_HOST, UNIFI_USERNAME y UNIFI_PASSWORD");
-  }
   if (!env.UNIFI_OS_HOST || !env.UNIFI_API_KEY) {
-    throw new Error("UNIFI_MODE=live requiere también UNIFI_OS_HOST y UNIFI_API_KEY (WLANs vía Integration API)");
+    throw new Error("UNIFI_MODE=live requiere UNIFI_OS_HOST y UNIFI_API_KEY (WLANs/nodos/reboot vía Integration API)");
   }
+  // UNIFI_HOST/USERNAME/PASSWORD (API clásica) son opcionales — ver
+  // UnifiLiveClientConfig, solo los usa listAlerts, que nada llama hoy.
   return new UnifiLiveClient({
     host: env.UNIFI_HOST,
     port: env.UNIFI_PORT,
