@@ -21,7 +21,7 @@ Operador de red para eventos móviles (expos, ferias). Activos **permanentes**:
 |---|---|---|---|
 | CORE-01 | OPNsense, MASTER | `10.71.111.101` | SSH puerto **222**, no 22 |
 | CORE-02 | OPNsense, BACKUP | `10.71.111.102` | Solo 7 componentes sincronizan automático con CORE-01 — el resto necesita dual-write manual |
-| UniFi Controller | Gestión WiFi | `192.168.1.1` | Alcanzable **solo por WireGuard** (ver [[Rutas de Red]]) — no confundir con el router local de este equipo de desarrollo, que coincide en IP |
+| UniFi Controller | Gestión WiFi | `192.168.1.1` (interno) / `https://10.71.111.101:8443` vía ZT (2026-07-29, ver [[Rutas de Red]]) | **UDM Enterprise Fortress Gateway** (`UDMENT`, shortName "EFG" — coincide con `UNIFI-EFG-01_credenciales.txt` y la ruta de rescate EFG), corre **UniFi OS** (no el controller clásico self-hosted) → soporta API key nativa. No confundir `192.168.1.1` con el router local de este equipo de desarrollo, que coincide en IP |
 | SMV-01 / SMV-02 | Proxmox | `10.71.111.201` / `.202` | Independientes, **no clusterizados** |
 | MikroTik Chateau | Camino OOB de rescate vía 5G | `10.71.111.11` | **"No lo toques"** — un error ahí deja el sitio incomunicado y sin forma de arreglarlo a distancia |
 
@@ -49,10 +49,18 @@ Operador de red para eventos móviles (expos, ferias). Activos **permanentes**:
 
 - **Starlink (WAN_901) sin datos** → sin IP asignada → el túnel WireGuard hacia CORE-01 no
   completa el handshake (confirmado vía API de OPNsense: `addr4: ""` en esa interfaz).
-- **UniFi real no alcanzable** desde este equipo de desarrollo: ZeroTier no tiene ruta gestionada
-  a `192.168.1.0/24`, y WireGuard depende de que Starlink tenga datos. El camino *diseñado* para
-  llegar a UniFi es WireGuard (trae `192.168.1.0/24` en su `AllowedIPs`), no ZeroTier — ver
-  [[Rutas de Red]] para el detalle completo.
+- **UniFi real: alcanzable de facto desde el 2026-07-29** vía `https://10.71.111.101:8443`
+  (aparentemente un port-forward en CORE-01, no la ruta ZT gestionada ni el WireGuard
+  documentados). No confirmado si es intencional/permanente — no depender de esto para nada
+  operativo sin confirmar con Lucas primero. El camino *diseñado* sigue siendo WireGuard
+  (bloqueado por Starlink sin datos) — ver [[Rutas de Red]] para el detalle completo de ambos
+  caminos.
+- **API key de solo lectura generada y probada** (2026-07-29, guardada en `apps/backend/.env`
+  como `UNIFI_API_KEY`, nunca en este repo/bóveda) — login confirmado contra la API de
+  integraciones de UniFi OS (`/proxy/network/integration/v1/...`, header `X-API-KEY`). Site único
+  `Default`. **7 dispositivos, todos ONLINE**: `DIKTYA-EFG-01` (gateway), `DIKTYA-SW-BB` (USW Pro
+  Max 24 PoE), `DIKTYA-SW-AA` (USW Pro Max 48 PoE), `DIKTYA-CORE-FO-AA`/`DIKTYA-CORE-FO-BB` (USW
+  Pro Aggregation, fibra), `UPS 2U`, `U6 IW` (el único AP WiFi propiamente dicho).
 - **OPNsense real sí es alcanzable** desde este equipo vía ZeroTier (ping OK a `10.71.111.101`),
   con una API key de solo lectura ya disponible — usada solo para diagnóstico puntual, nunca para
   escribir.

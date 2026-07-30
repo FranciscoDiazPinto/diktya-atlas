@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ShieldCheck, ShieldOff } from "lucide-react";
+import { ShieldCheck, ShieldOff, RefreshCw } from "lucide-react";
 import { useOpnsenseStatus } from "../../hooks/useOpnsenseStatus.js";
 import { useNetworkStatus } from "../../hooks/useNetworkStatus.js";
+import { useUnifiOsStatus } from "../../hooks/useUnifiOsStatus.js";
 import { useCreateTicket } from "../../hooks/useCreateTicket.js";
 import { LoadingState } from "../common/LoadingState.js";
 import { ErrorState } from "../common/ErrorState.js";
@@ -110,6 +111,69 @@ function UnifiSummaryCard() {
   );
 }
 
+function UnifiOsRealCard() {
+  const { data, isLoading, isError, error, refetch, isFetched } = useUnifiOsStatus();
+  const wiredCount = data?.clients.filter((c) => c.type === "WIRED").length ?? 0;
+  const wirelessCount = data?.clients.filter((c) => c.type === "WIRELESS").length ?? 0;
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle>UniFi (real)</CardTitle>
+          <CardDescription>
+            Solo lectura, hardware real vía API de integraciones — sin señal/alarmas/WLANs (esa API no los expone)
+          </CardDescription>
+        </div>
+        <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isLoading}>
+          <RefreshCw className={isLoading ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
+          {isFetched ? "Actualizar" : "Consultar ahora"}
+        </Button>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        {isError && (
+          <p className="text-sm text-status-critical">No se pudo consultar: {(error as Error).message}</p>
+        )}
+        {!isFetched && !isLoading && !isError && (
+          <EmptyState
+            title="Sin consultar todavía"
+            description="No se actualiza solo (para no generarle tráfico de fondo al equipo real) — apretá 'Consultar ahora'."
+          />
+        )}
+        {data && (
+          <>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Sitio: {data.site.name} · {data.clients.length} clientes ({wiredCount} cableados, {wirelessCount}{" "}
+              WiFi)
+            </p>
+            <div>
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Dispositivos ({data.devices.length})
+              </p>
+              <ul className="flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
+                {data.devices.map((d) => (
+                  <li key={d.id} className="flex items-center justify-between gap-3 py-1.5 text-sm">
+                    <div className="flex flex-col">
+                      <span className="font-medium text-slate-800 dark:text-slate-200">{d.name}</span>
+                      <span className="text-xs text-slate-400">
+                        {d.model} · {d.ipAddress}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <StatusDot tone={nodeTone(d.state)} />
+                      <span className="text-xs text-slate-500 dark:text-slate-400">{d.state}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function RequestChangeForm() {
   const [sistema, setSistema] = useState<"OPNsense" | "UniFi">("OPNsense");
   const [titulo, setTitulo] = useState("");
@@ -196,6 +260,7 @@ export function InfraView() {
       <div className="flex flex-col gap-4">
         <OpnsenseCard />
         <UnifiSummaryCard />
+        <UnifiOsRealCard />
       </div>
       <RequestChangeForm />
     </div>

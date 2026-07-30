@@ -9,6 +9,7 @@ import fastifyStatic from "@fastify/static";
 import { ZodError } from "zod";
 import { env } from "./config/env.js";
 import { HttpError } from "./lib/errors.js";
+import { LockAcquisitionError } from "./services/lock.service.js";
 import { realtimeHub } from "./realtime/hub.js";
 import { uploadsDir } from "./services/fileStorage.service.js";
 import { authenticate } from "./auth/middleware.js";
@@ -22,6 +23,7 @@ import { venueRoutes } from "./routes/venues.js";
 import { eventRoutes } from "./routes/events.js";
 import { eventZoneRoutes } from "./routes/eventZones.js";
 import { opnsenseRoutes } from "./routes/opnsense.js";
+import { unifiOsRoutes } from "./routes/unifiOs.js";
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({ logger: env.NODE_ENV !== "test" });
@@ -50,6 +52,9 @@ export function buildApp(): FastifyInstance {
     }
     if (err instanceof ZodError) {
       return reply.code(400).send({ error: "Validación fallida", detalles: err.flatten() });
+    }
+    if (err instanceof LockAcquisitionError) {
+      return reply.code(409).send({ error: "Ese recurso ya tiene una operación en curso, probá de nuevo en unos segundos" });
     }
     if ((err as { code?: string }).code === "FST_REQ_FILE_TOO_LARGE") {
       return reply.code(413).send({ error: "El archivo supera el tamaño máximo permitido (50MB)" });
@@ -91,6 +96,7 @@ export function buildApp(): FastifyInstance {
   app.register(eventRoutes);
   app.register(eventZoneRoutes);
   app.register(opnsenseRoutes);
+  app.register(unifiOsRoutes);
 
   return app;
 }

@@ -19,6 +19,16 @@ const EnvSchema = z.object({
   UNIFI_PASSWORD: z.string().optional(),
   UNIFI_SITE: z.string().default("default"),
   UNIFI_VERIFY_TLS: z.coerce.boolean().default(true),
+  // API de integraciones de un UniFi OS real (UDM/UDR/etc), separada del
+  // UnifiClient clásico de arriba — ver integrations/unifiOs/. Solo
+  // lectura: esta API no expone WLANs ni alarmas (404, no 403 — no es
+  // permisos del key, la ruta no existe en esta versión de la API).
+  UNIFI_OS_HOST: z.string().optional(), // ej. "10.71.111.101:8443"
+  UNIFI_API_KEY: z.string().optional(),
+  // Separado de UNIFI_VERIFY_TLS (que es para el UnifiClient clásico) —
+  // el UDM real usado en pruebas tiene certificado self-signed, default
+  // false a propósito para no romper por TLS al primer intento.
+  UNIFI_OS_VERIFY_TLS: z.coerce.boolean().default(false),
 
   OPNSENSE_MODE: z.enum(["mock", "live"]).default("mock"),
   OPNSENSE_HOST: z.string().optional(),

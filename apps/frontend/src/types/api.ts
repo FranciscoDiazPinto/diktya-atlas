@@ -148,6 +148,42 @@ export interface OpnsenseStatusSummary {
   alertas: OpnsenseAlert[];
 }
 
+/**
+ * Estado real (no mock) de un UniFi OS vía su API pública de
+ * integraciones — solo lectura, ver integrations/unifiOs. No tiene
+ * señal/uptime/alarmas/WLANs porque esa API no los expone todavía.
+ */
+export interface UnifiOsSite {
+  id: string;
+  name: string;
+  internalReference: string;
+}
+
+export interface UnifiOsDevice {
+  id: string;
+  macAddress: string;
+  ipAddress: string;
+  name: string;
+  model: string;
+  state: string;
+  firmwareVersion: string;
+}
+
+export interface UnifiOsConnectedClient {
+  id: string;
+  type: string;
+  name: string;
+  macAddress: string;
+  connectedAt: string;
+  uplinkDeviceId?: string;
+}
+
+export interface UnifiOsStatus {
+  site: UnifiOsSite;
+  devices: UnifiOsDevice[];
+  clients: UnifiOsConnectedClient[];
+}
+
 export interface ApNodeDetail extends ApiNetworkNode {
   wifiNetworks: ApiWifiNetwork[];
   alerts: ApiAlert[];
