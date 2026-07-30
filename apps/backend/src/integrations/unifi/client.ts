@@ -1,5 +1,20 @@
 import type { NetworkNode, WifiNetwork, Alert } from "../../domain/network.js";
 
+/**
+ * Escritura que la Integration API no puede hacer de forma segura sin
+ * intervención humana (crear un SSID o una VLAN nueva implica definir
+ * seguridad WiFi / config de red que NetBot no gestiona — ver
+ * liveClient.ts::writeWifiNetwork). El llamador (worker-remediation) la
+ * distingue de un error genérico para crear un ticket de creación manual
+ * en vez de reintentar el job.
+ */
+export class AutomatedWifiWriteNotSupportedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = new.target.name;
+  }
+}
+
 export interface WriteWifiNetworkInput {
   sitio: string;
   ssid: string;

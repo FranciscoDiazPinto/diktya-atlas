@@ -75,10 +75,12 @@ export class EmailChannelStub implements NotificationChannel {
 
 function buildChannelsFromEnv(): NotificationChannel[] {
   const channels: NotificationChannel[] = [];
-  if (env.TELEGRAM_BOT_TOKEN) {
-    // El chat_id del grupo de técnicos también debería venir de config;
-    // se deja como parte del token compuesto hasta tener modelo de turnos.
-    channels.push(new TelegramChannel(env.TELEGRAM_BOT_TOKEN, "TECH_GROUP_CHAT_ID"));
+  if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID) {
+    channels.push(new TelegramChannel(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_CHAT_ID));
+  } else if (env.TELEGRAM_BOT_TOKEN || env.TELEGRAM_CHAT_ID) {
+    console.warn(
+      "[notification.service] TELEGRAM_BOT_TOKEN y TELEGRAM_CHAT_ID deben configurarse juntos — falta uno de los dos, canal Telegram deshabilitado"
+    );
   }
   if (env.SLACK_WEBHOOK_URL) channels.push(new SlackChannel(env.SLACK_WEBHOOK_URL));
   if (env.GENERIC_WEBHOOK_URL) channels.push(new WebhookChannel(env.GENERIC_WEBHOOK_URL));

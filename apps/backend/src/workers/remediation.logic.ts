@@ -1,7 +1,8 @@
-import type { VlanPlan } from "@diktya-atlas/shared";
+import type { VlanPlan, WifiNetwork } from "@diktya-atlas/shared";
 import { prisma } from "../db/client.js";
 import type { RemediationJobData } from "./queues.js";
 import { getUnifiClient } from "../integrations/unifi/index.js";
+import { AutomatedWifiWriteNotSupportedError } from "../integrations/unifi/client.js";
 import { withWriteLock, LockAcquisitionError } from "../services/lock.service.js";
 import { verifyWriteAndRollbackIfNeeded } from "../services/writeVerification.service.js";
 import { markApplied } from "../services/vlanReservation.service.js";
@@ -71,12 +72,32 @@ export async function processRemediation(data: RemediationJobData): Promise<void
         return;
       }
 
-      const written = await client.writeWifiNetwork({
-        sitio: data.sitio,
-        ssid: data.ssid,
-        vlanId: data.vlanId,
-        bandas: data.bandas,
-      });
+      let written: WifiNetwork;
+      try {
+        written = await client.writeWifiNetwork({
+          sitio: data.sitio,
+          ssid: data.ssid,
+          vlanId: data.vlanId,
+          bandas: data.bandas,
+        });
+      } catch (err) {
+        if (!(err instanceof AutomatedWifiWriteNotSupportedError)) throw err;
+        const ticket = await createTicket({
+          titulo: `Requiere creación manual: "${data.ssid}" en ${data.sitio}`,
+          descripcion: `${err.message} No es un fallo transitorio — no se reintentará automáticamente.`,
+          severidad: "ADVERTENCIA",
+          vlanReservationId: reservation.id,
+        });
+        await publishRealtimeEvent({ type: "ticket_updated", payload: ticket });
+        await recordAudit({
+          workerName: "worker-remediation",
+          toolName: "apply_vlan_plan",
+          parametros: data,
+          resultado: { abortado: true, motivo: "requiere_creacion_manual", detalle: err.message, ticketId: ticket.id },
+          exitoso: false,
+        });
+        return;
+      }
 
       const verification = await verifyWriteAndRollbackIfNeeded({
         client,

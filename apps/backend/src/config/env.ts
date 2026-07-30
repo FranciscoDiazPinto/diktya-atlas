@@ -47,6 +47,7 @@ const EnvSchema = z.object({
   OPENAI_BASE_URL: z.string().optional(),
 
   TELEGRAM_BOT_TOKEN: z.string().optional(),
+  TELEGRAM_CHAT_ID: z.string().optional(),
   SLACK_WEBHOOK_URL: z.string().optional(),
   EMAIL_SMTP_URL: z.string().optional(),
   GENERIC_WEBHOOK_URL: z.string().optional(),
@@ -68,7 +69,10 @@ function loadEnv() {
   }
 
   if (parsed.data.UNIFI_MODE === "live") {
-    const missing = ["UNIFI_HOST", "UNIFI_USERNAME", "UNIFI_PASSWORD"].filter(
+    // UNIFI_OS_HOST/UNIFI_API_KEY ya no son solo del panel /infra de solo
+    // lectura: writeWifiNetwork (integrations/unifi/liveClient.ts) los usa
+    // para escribir WLANs vía la Integration API.
+    const missing = ["UNIFI_HOST", "UNIFI_USERNAME", "UNIFI_PASSWORD", "UNIFI_OS_HOST", "UNIFI_API_KEY"].filter(
       (key) => !parsed.data[key as keyof typeof parsed.data]
     );
     if (missing.length > 0) {
