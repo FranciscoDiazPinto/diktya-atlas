@@ -111,6 +111,27 @@ export interface NetworkStatusSummary {
   alertasRecientes: ApiAlert[];
 }
 
+/** Respuesta de GET /reports/digest — ver activityDigest.service.ts en el backend. */
+export interface ActivityDigest {
+  rango: { desde: string; hasta: string };
+  eventDeploymentId: string | null;
+  estadoActual: { totalNodos: number; online: number; offline: number; adoptando: number };
+  alertas: { total: number; porSeveridad: Record<ApiAlertSeverity, number>; items: ApiAlert[] };
+  tickets: {
+    total: number;
+    porSeveridad: Record<ApiAlertSeverity, number>;
+    porEstado: Record<ApiTicketStatus, number>;
+    tiempoResolucionPromedioMin: number | null;
+  };
+  vlan: { total: number; porEstado: Record<"RESERVADA" | "APLICADA" | "LIBERADA", number> };
+  auditoria: {
+    total: number;
+    exitosos: number;
+    fallidos: number;
+    porWorker: Record<string, { total: number; exitosos: number; fallidos: number }>;
+  };
+}
+
 /**
  * Estado en vivo del cliente OPNsense (mock hoy — fase 2 para real, ver
  * integrations/opnsense). A diferencia de NetworkStatusSummary (que lee de

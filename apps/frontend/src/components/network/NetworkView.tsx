@@ -6,6 +6,7 @@ import { EmptyState } from "../common/EmptyState.js";
 import { NodeList } from "./NodeList.js";
 import { NodeDetailPanel } from "./NodeDetailPanel.js";
 import { AlertsPanel } from "./AlertsPanel.js";
+import { ActivityDigestPanel } from "./ActivityDigestPanel.js";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/Card.js";
 
 export function NetworkView() {
@@ -52,6 +53,8 @@ export function NetworkView() {
             <AlertsPanel alertas={alertasFiltradas} />
           </CardContent>
         </Card>
+
+        <ActivityDigestPanel />
       </div>
 
       <NodeDetailPanel nodeId={nodeId} />

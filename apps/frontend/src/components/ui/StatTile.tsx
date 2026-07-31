@@ -13,7 +13,8 @@ const TONE_ICON_CLASS: Record<StatusTone, string> = {
 
 export interface StatTileProps {
   label: string;
-  value: number;
+  /** Número simple, o texto ya formateado (ej. "1h 20m", "—") cuando el valor no es una cantidad cruda. */
+  value: number | string;
   icon: ReactNode;
   tone: StatusTone;
   to?: string;

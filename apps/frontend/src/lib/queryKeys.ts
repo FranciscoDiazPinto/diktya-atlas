@@ -16,4 +16,5 @@ export const queryKeys = {
   unifiOsStatus: () => ["unifi-os-status"] as const,
   tickets: (filters: TicketFilters) => ["tickets", filters] as const,
   ticketDetail: (id: string) => ["ticket", id] as const,
+  activityDigest: (desde: string, hasta: string) => ["activity-digest", desde, hasta] as const,
 };
