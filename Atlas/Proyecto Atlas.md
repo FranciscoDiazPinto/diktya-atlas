@@ -1,6 +1,6 @@
 ---
 tags: [atlas, netbot, documentacion]
-updated: 2026-07-30 (noche)
+updated: 2026-07-31
 ---
 
 # Diktya Atlas — NetBot
@@ -83,25 +83,6 @@ Tres roles (`ADMIN`, `TECNICO`, `VISUALIZADOR`), filtrados en dos capas (tools d
 backend), auth real con JWT+refresh+TOTP 2FA. Matriz completa y detalle de auth → ver la nota
 dedicada.
 
-## ⚠️ Pendiente urgente para la próxima sesión
-
-**El chat responde mal sobre el estado real de la red.** Probado el 2026-07-30 de noche:
-preguntando "hay algún AP arriba para conectarme??", el bot respondió que no hay ningún AP
-online ni dispositivos activos — **falso**, `U6 IW` está online (confirmado por `/red` y por
-`/network/status` directo). La tool `get_network_status` lee exactamente la misma fuente
-(`getNetworkStatusSummary`, Postgres) que ya se confirmó correcta — así que el problema está en
-el LLM, no en los datos. Hipótesis sin confirmar (quedó interrumpido antes de reproducir):
-1. El modelo gratis de OpenRouter (`openai/gpt-oss-20b:free`) no está invocando la tool de
-   verdad y alucina la respuesta.
-2. El LLM pasa un argumento `sitio` (ej. `"oficina-central"`, el de los nodos mock ya borrados)
-   que no matchea el `sitio: "default"` de los nodos reales — resultado vacío pero real, y el
-   bot lo reporta "honestamente" mal interpretado.
-
-**Primer paso para retomar**: `curl -X POST http://localhost:3000/chat -H "Content-Type:
-application/json" -H "x-role: VISUALIZADOR" -H "x-user-id: test" -d '{"message": "hay algun ap
-arriba?"}'` e inspeccionar el campo `toolResults` de la respuesta — ahí se ve el argumento
-exacto que mandó el LLM y qué le devolvió la tool.
-
 ## Estado actual / pendientes conocidos
 
 - Cliente OPNsense real: no implementado (mock funcional, ver [[OPNsense y UniFi]]).
@@ -123,18 +104,24 @@ exacto que mandó el LLM y qué le devolvió la tool.
 - **Tipo de dispositivo (AP/Switch/Gateway/UPS) con íconos en `/red` (2026-07-30)** — campo real
   `tipoDispositivo`, clasificado server-side desde `features` de la Integration API + casos
   especiales por nombre de modelo (UPS y el gateway real no traen el feature esperado).
-- **Reporte de actividad (`GET /reports/digest`) agregado (2026-07-30)** — alertas/tickets
-  (+tiempo de resolución)/auditoría/reservas VLAN por rango de fechas, sin cambios de schema.
+- **Reporte de actividad (`GET /reports/digest`) agregado (2026-07-30), con sección "Actividad"
+  en `/red` desde el 2026-07-31** — alertas/tickets (+tiempo de resolución)/auditoría/reservas
+  VLAN por rango de fechas (Hoy/Ayer/Últimos 7 días), stat tiles + tabla de auditoría por worker.
   Deliberadamente NO es uptime real (`NetworkNode` solo guarda el estado actual, se sobreescribe
   en cada sync) — un reporte de uptime por dispositivo necesitaría una tabla de historial de
-  estado + cambios en el worker, sin construir todavía. Sin UI en el frontend todavía, solo
-  backend+test.
+  estado + cambios en el worker, sin construir todavía.
 - **Notificaciones Telegram: corregidas y probadas en real (2026-07-30)** — tenían un bug real
   (chat_id hardcodeado a un placeholder). Ahora requiere `TELEGRAM_BOT_TOKEN` +
   `TELEGRAM_CHAT_ID` juntas.
-- **Auto-remediación por criticidad: diseño conceptual, sin implementar** (ej. AP offline → NetBot
-  intenta resetear/re-adoptar antes de escalar a técnico) — ver [[Plataforma ATLAS (Codex)]] §
-  Decisión, incluye qué falta construir.
+- **Auto-remediación por criticidad — implementada 2026-07-31** — ver [[Plataforma ATLAS (Codex)]]
+  § Decisión para el detalle completo. Reset + re-adopción para APs offline antes de escalar a
+  técnico; re-adopción sin validar contra hardware real. `worker-autoremediate` no arranca solo.
+- **Suite de tests aislada de la infra real (2026-07-30/31)**: base `netbot_test` + Redis índice
+  `/1` separados — antes cada `vitest run` insertaba datos de prueba en la base real y contaminaba
+  los reportes. `pnpm --filter backend db:test:setup` antes de correr tests por primera vez.
+- Investigada la respuesta rara del chat sobre estado de red (2026-07-30 noche) — confirmado por
+  el usuario el 2026-07-31: era un problema de redacción del LLM, no de alcance/datos de la tool.
+  Sin acción pendiente.
 - Existe una plataforma separada e independiente ("ATLAS", de Codex) operando sobre la misma
   infraestructura real — **no relacionada con este software**, ver
   [[Plataforma ATLAS (Codex)]] antes de asumir que algo de observabilidad/alertas ya está resuelto

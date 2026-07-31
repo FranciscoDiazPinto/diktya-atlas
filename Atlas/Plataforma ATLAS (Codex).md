@@ -1,6 +1,6 @@
 ---
 tags: [atlas, netbot, codex, infraestructura]
-updated: 2026-07-30
+updated: 2026-07-31
 ---
 
 # Plataforma ATLAS (de Codex) — no confundir con NetBot
@@ -56,13 +56,18 @@ consumiendo la API de ATLAS, no duplicando su código) —
 2. **Alertas por Telegram** — ya existía el pipeline (`worker-monitor` → `worker-triage` →
    `notifyTechnicians`), tenía un bug real (chat_id hardcodeado a un string placeholder en vez de
    leer `TELEGRAM_CHAT_ID`) — corregido y probado en real el 2026-07-30.
-3. **Auto-remediación por criticidad ("a posterior", sin implementar todavía)** — ejemplo dado:
-   si un AP se desconecta, que NetBot intente resetearlo y re-adoptarlo antes de escalar a un
-   ticket para técnico en terreno. Rompe a propósito una invariante de seguridad que hoy está
-   escrita explícita en el código (`rebootNode` "nunca se dispara solo, solo con confirmación
-   humana") — diseño pendiente: umbral de disparo, reintentos, re-adopción (requiere
-   `GET /v1/pending-devices` + `POST /v1/sites/{siteId}/devices`, no implementado todavía),
-   verificación post-intento antes de recién ahí generar el ticket.
+3. **Auto-remediación por criticidad — implementada 2026-07-31** (`services/autoRemediation.service.ts`).
+   AP offline → intenta reset, espera, relee estado; si sigue caído, busca el device en
+   pending-devices por MAC y re-adopta; recién si ambos fallan escala a ticket (con nota de qué se
+   intentó, para que el técnico no repita pasos). Rompe a propósito la invariante que tenía
+   `rebootNode` ("nunca se dispara solo desde un worker") — mitigada por: alcance por tipo de
+   dispositivo controlado por Admin (`AUTO_REMEDIATE_DEVICE_TYPES`, default solo AP — no es un rol
+   de usuario, no hay nadie autenticado cuando dispara el sistema), cooldown por device (evita loop
+   sobre uno que está flapping), y el mismo lock distribuido que ya usaba el reboot manual.
+   **Re-adopción es la parte no probada**: no hay forma de validarla contra hardware real sin
+   desconectar un equipo a propósito, y puede que el device no conserve su config (SSIDs, VLAN) al
+   re-adoptarse — el ticket resultante siempre pide revisión humana cuando pasó por esa rama.
+   Workers nuevos (`worker-autoremediate`) no arrancan solos, mismo patrón manual que el resto.
 
 ## Ver también
 
