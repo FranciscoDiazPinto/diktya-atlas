@@ -14,6 +14,7 @@ import { Badge } from "../ui/Badge.js";
 import { Button } from "../ui/Button.js";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../ui/Select.js";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../ui/Card.js";
+import { AvailabilityDashboard } from "./AvailabilityDashboard.js";
 import type { ApiAlertSeverity } from "../../types/api.js";
 
 function nodeTone(status: string): StatusTone {
@@ -256,13 +257,16 @@ function RequestChangeForm() {
 
 export function InfraView() {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <div className="flex flex-col gap-4">
-        <OpnsenseCard />
-        <UnifiSummaryCard />
-        <UnifiOsRealCard />
+    <div className="flex flex-col gap-4">
+      <AvailabilityDashboard />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="flex flex-col gap-4">
+          <OpnsenseCard />
+          <UnifiSummaryCard />
+          <UnifiOsRealCard />
+        </div>
+        <RequestChangeForm />
       </div>
-      <RequestChangeForm />
     </div>
   );
 }

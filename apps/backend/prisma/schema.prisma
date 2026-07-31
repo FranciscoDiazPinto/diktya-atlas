@@ -95,9 +95,30 @@ model NetworkNode {
   alerts       Alert[]
   tickets      Ticket[]
   apPlacement  ApPlacement?
+  statusEvents NodeStatusEvent[]
 
   @@index([sitio])
   @@map("network_nodes")
+}
+
+/**
+ * Un registro por CADA cambio de estado (no un snapshot periódico) — mucho
+ * más liviano que registrar cada poll de worker-monitor (cada 30s), y
+ * alcanza perfecto para calcular disponibilidad: el estado entre dos
+ * eventos consecutivos es constante, así que el % online de una ventana es
+ * la suma de los tramos "status=ONLINE" entre eventos. Ver
+ * services/nodeAvailability.service.ts.
+ */
+model NodeStatusEvent {
+  id        String     @id @default(cuid())
+  nodeId    String
+  status    NodeStatus
+  createdAt DateTime   @default(now())
+
+  node NetworkNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId, createdAt])
+  @@map("node_status_events")
 }
 
 model WifiNetwork {

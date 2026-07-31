@@ -8,33 +8,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from ".
 import { LoadingState } from "../common/LoadingState.js";
 import { ErrorState } from "../common/ErrorState.js";
 import type { StatusTone } from "../ui/StatusDot.js";
-
-type RangoPreset = "hoy" | "ayer" | "7dias";
-
-function startOfDay(d: Date): Date {
-  const copy = new Date(d);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
-}
-
-function endOfDay(d: Date): Date {
-  const copy = new Date(d);
-  copy.setHours(23, 59, 59, 999);
-  return copy;
-}
-
-function rangoFor(preset: RangoPreset): { desde: string; hasta: string } {
-  const ahora = new Date();
-  if (preset === "hoy") return { desde: startOfDay(ahora).toISOString(), hasta: ahora.toISOString() };
-  if (preset === "ayer") {
-    const ayer = new Date(ahora);
-    ayer.setDate(ayer.getDate() - 1);
-    return { desde: startOfDay(ayer).toISOString(), hasta: endOfDay(ayer).toISOString() };
-  }
-  const hace7 = new Date(ahora);
-  hace7.setDate(hace7.getDate() - 7);
-  return { desde: startOfDay(hace7).toISOString(), hasta: ahora.toISOString() };
-}
+import { type RangoPreset, RANGO_PRESETS, rangoFor } from "../../lib/dateRanges.js";
 
 function formatMinutos(min: number | null): string {
   if (min === null) return "—";
@@ -48,12 +22,6 @@ function toneParaSeveridad(porSeveridad: Record<"INFO" | "ADVERTENCIA" | "CRITIC
   if (porSeveridad.ADVERTENCIA > 0) return "warning";
   return "good";
 }
-
-const PRESETS: Array<{ id: RangoPreset; label: string }> = [
-  { id: "hoy", label: "Hoy" },
-  { id: "ayer", label: "Ayer" },
-  { id: "7dias", label: "Últimos 7 días" },
-];
 
 /**
  * Solo point-in-time / conteos agregados de un rango — no hay serie
@@ -78,7 +46,7 @@ export function ActivityDigestPanel() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle>Actividad</CardTitle>
           <div className="flex gap-1">
-            {PRESETS.map((p) => (
+            {RANGO_PRESETS.map((p) => (
               <Button
                 key={p.id}
                 size="sm"

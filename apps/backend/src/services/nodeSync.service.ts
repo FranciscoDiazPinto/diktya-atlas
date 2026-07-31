@@ -69,6 +69,13 @@ export async function syncNode(node: NetworkNode) {
     },
   });
 
+  // Un registro por cambio (no por poll) — ver el comentario del modelo en
+  // schema.prisma. `previous` ausente (primer sync de un nodo nuevo) cuenta
+  // como cambio: establece el punto de partida de su historial.
+  if (previous?.status !== dbStatus) {
+    await prisma.nodeStatusEvent.create({ data: { nodeId: saved.id, status: dbStatus } });
+  }
+
   const wentOffline = previous?.status !== PrismaNodeStatus.OFFLINE && dbStatus === PrismaNodeStatus.OFFLINE;
   if (wentOffline) {
     const alert = await prisma.alert.create({

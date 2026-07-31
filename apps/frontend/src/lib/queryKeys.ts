@@ -17,4 +17,5 @@ export const queryKeys = {
   tickets: (filters: TicketFilters) => ["tickets", filters] as const,
   ticketDetail: (id: string) => ["ticket", id] as const,
   activityDigest: (desde: string, hasta: string) => ["activity-digest", desde, hasta] as const,
+  availability: (desde: string, hasta: string) => ["availability", desde, hasta] as const,
 };

@@ -132,6 +132,21 @@ export interface ActivityDigest {
   };
 }
 
+/** Respuesta de GET /reports/availability — ver nodeAvailability.service.ts en el backend. */
+export interface ApiAvailability {
+  rango: { desde: string; hasta: string };
+  disponibilidadPromedio: number | null;
+  porNodo: Array<{
+    nodeId: string;
+    nombre: string;
+    tipoDispositivo: ApiDeviceType;
+    disponibilidadPct: number | null;
+  }>;
+  serieTemporal: Array<{ timestamp: string; porcentajeOnline: number | null }>;
+  histogramaOutages: Array<{ label: string; cantidad: number }>;
+  totalOutages: number;
+}
+
 /**
  * Estado en vivo del cliente OPNsense (mock hoy — fase 2 para real, ver
  * integrations/opnsense). A diferencia de NetworkStatusSummary (que lee de
