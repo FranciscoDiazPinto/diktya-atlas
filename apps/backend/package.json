@@ -13,6 +13,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
+    "db:test:setup": "tsx --env-file=.env prisma/setupTestDb.ts",
     "worker:monitor": "tsx watch --env-file=.env src/workers/worker-monitor.ts",
     "worker:triage": "tsx watch --env-file=.env src/workers/worker-triage.ts",
     "worker:remediation": "tsx watch --env-file=.env src/workers/worker-remediation.ts",
