@@ -24,6 +24,7 @@ import { eventRoutes } from "./routes/events.js";
 import { eventZoneRoutes } from "./routes/eventZones.js";
 import { opnsenseRoutes } from "./routes/opnsense.js";
 import { unifiOsRoutes } from "./routes/unifiOs.js";
+import { reportRoutes } from "./routes/reports.js";
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({ logger: env.NODE_ENV !== "test" });
@@ -97,6 +98,7 @@ export function buildApp(): FastifyInstance {
   app.register(eventZoneRoutes);
   app.register(opnsenseRoutes);
   app.register(unifiOsRoutes);
+  app.register(reportRoutes);
 
   return app;
 }
