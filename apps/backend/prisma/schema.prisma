@@ -79,6 +79,15 @@ model NetworkNode {
   clientesConectados Int        @default(0)
   uptimeSegundos     Int?
   ultimaVezVisto     DateTime?
+  // MAC real del dispositivo — necesaria para volver a encontrarlo en
+  // pending-devices si desaparece de adopted-devices (ver
+  // autoRemediation.service.ts). No la trae la API clásica de alarmas,
+  // solo la Integration API.
+  macAddress         String?
+  // Cooldown de auto-remediación (ver autoRemediation.service.ts): se
+  // actualiza al INTENTAR, sin importar el resultado, para no reintentar
+  // en loop sobre un dispositivo que está flapping.
+  lastAutoRemediationAt DateTime?
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 

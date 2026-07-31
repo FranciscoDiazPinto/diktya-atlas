@@ -9,6 +9,12 @@ import "dotenv/config";
  */
 process.env.UNIFI_MODE = "mock";
 process.env.OPNSENSE_MODE = "mock";
+// Los tests de autoRemediation.service esperan este tiempo real entre el
+// reset y la relectura de estado (default 90s en producción) — sin esto
+// cada test tarda minutos y, peor, puede vencer el timeout de Vitest a
+// mitad de un withLock y dejar el lock de Redis tomado para el siguiente
+// test (confirmado: pasó exactamente eso antes de este fix).
+process.env.AUTO_REMEDIATE_WAIT_SECONDS = "1"; // positive() en el schema, no acepta 0
 
 /**
  * Postgres y Redis de test, aislados de los reales — encontrado el

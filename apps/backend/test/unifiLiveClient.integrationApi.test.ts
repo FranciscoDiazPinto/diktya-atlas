@@ -16,6 +16,8 @@ const listDevices = vi.fn();
 const listClients = vi.fn();
 const getDeviceLatestStatistics = vi.fn();
 const executeDeviceAction = vi.fn();
+const listPendingDevices = vi.fn();
+const adoptDevice = vi.fn();
 
 vi.mock("../src/integrations/unifiOs/client.js", () => ({
   UnifiOsClient: vi.fn().mockImplementation(() => ({
@@ -28,6 +30,8 @@ vi.mock("../src/integrations/unifiOs/client.js", () => ({
     listClients,
     getDeviceLatestStatistics,
     executeDeviceAction,
+    listPendingDevices,
+    adoptDevice,
   })),
 }));
 
@@ -170,5 +174,46 @@ describe("UnifiLiveClient.listNodes / rebootNode (Integration API)", () => {
     await client.rebootNode("dev-ap");
 
     expect(executeDeviceAction).toHaveBeenCalledWith("site-uuid", "dev-ap", "RESTART");
+  });
+});
+
+describe("UnifiLiveClient.listPendingDevices / adoptDevice (re-adopción, sin validar contra hardware real)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resolveSiteId.mockResolvedValue("site-uuid");
+  });
+
+  it("listPendingDevices delega directo en la Integration API, sin resolver siteId (no está bajo /sites)", async () => {
+    listPendingDevices.mockResolvedValue([
+      { macAddress: "AA:BB:CC:DD:EE:FF", model: "U6-Pro", ipAddress: "10.0.0.5", state: "PENDING_ADOPTION", features: ["accessPoint"], adoptionTargetSiteIds: ["site-uuid"] },
+    ]);
+
+    const client = makeClient();
+    const pendientes = await client.listPendingDevices();
+
+    expect(pendientes).toHaveLength(1);
+    expect(pendientes[0].macAddress).toBe("AA:BB:CC:DD:EE:FF");
+    expect(resolveSiteId).not.toHaveBeenCalled();
+  });
+
+  it("adoptDevice llama a la Integration API con el siteId resuelto y devuelve el nodo normalizado", async () => {
+    adoptDevice.mockResolvedValue({
+      id: "dev-nuevo-uuid",
+      macAddress: "AA:BB:CC:DD:EE:FF",
+      ipAddress: "10.0.0.5",
+      name: "AP Recepción",
+      model: "U6-Pro",
+      state: "ADOPTING",
+      firmwareVersion: "1.0",
+      features: ["accessPoint"],
+    });
+
+    const client = makeClient();
+    const nodo = await client.adoptDevice("AA:BB:CC:DD:EE:FF");
+
+    expect(adoptDevice).toHaveBeenCalledWith("site-uuid", "AA:BB:CC:DD:EE:FF");
+    expect(nodo.id).toBe("dev-nuevo-uuid");
+    expect(nodo.tipoDispositivo).toBe("AP");
+    expect(nodo.status).toBe("adopting");
   });
 });

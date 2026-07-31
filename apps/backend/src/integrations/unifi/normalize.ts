@@ -102,6 +102,7 @@ export function normalizeIntegrationDevice(
     nombre: device.name,
     modelo: device.model,
     tipoDispositivo: mapDeviceType(device),
+    macAddress: device.macAddress,
     status: mapDeviceState(device.state),
     clientesConectados,
     uptimeSegundos: stats?.uptimeSec,

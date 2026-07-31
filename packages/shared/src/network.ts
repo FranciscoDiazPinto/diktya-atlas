@@ -18,6 +18,7 @@ export const NetworkNodeSchema = z.object({
   nombre: z.string(),
   modelo: z.string().optional(),
   tipoDispositivo: DeviceTypeSchema.default("OTRO"),
+  macAddress: z.string().optional(),
   status: NodeStatusSchema,
   senalDbm: z.number().optional(),
   clientesConectados: z.number().int().nonnegative(),

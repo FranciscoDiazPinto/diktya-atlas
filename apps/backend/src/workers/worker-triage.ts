@@ -38,7 +38,7 @@ async function classifyWithLlm(mensaje: string): Promise<AlertSeverity> {
  * severidad ya asignada por worker-monitor como fallback — nunca se
  * bloquea el ticket por falta de LLM.
  */
-async function triageAlert(alertId: string): Promise<void> {
+async function triageAlert(alertId: string, notaPrevia?: string): Promise<void> {
   const alert = await prisma.alert.findUnique({ where: { id: alertId }, include: { node: true } });
   if (!alert) {
     console.warn(`[worker-triage] alerta ${alertId} no encontrada (¿ya resuelta?)`);
@@ -65,13 +65,20 @@ async function triageAlert(alertId: string): Promise<void> {
     }
   }
 
-  // El AP nunca se reinicia solo desde acá — worker-remediation por ahora
-  // solo ejecuta aplicación de VLAN. Lo único que hace este flujo es
-  // sugerir la acción en la descripción del ticket; un técnico la confirma
-  // manualmente desde /red (POST /network/nodes/:id/reboot).
-  const descripcion = offlineCritico
-    ? `${alert.mensaje}\n\nSugerencia: lleva ${Math.round(offlineMinutos)} min sin responder — considerá reiniciarlo desde la vista Red (acción manual, requiere confirmación).`
-    : alert.mensaje;
+  // Este flujo nunca reinicia nada — solo sugiere la acción en la
+  // descripción del ticket, un técnico la confirma manualmente desde /red
+  // (POST /network/nodes/:id/reboot). Para los tipos de dispositivo
+  // habilitados por AUTO_REMEDIATE_DEVICE_TYPES, ya se intentó resetear/
+  // re-adoptar automáticamente ANTES de llegar acá (ver
+  // autoRemediation.service.ts) — si ese intento falló, `notaPrevia` trae
+  // el detalle para que el técnico no repita pasos ya probados.
+  const partes = [notaPrevia, alert.mensaje];
+  if (offlineCritico) {
+    partes.push(
+      `Sugerencia: lleva ${Math.round(offlineMinutos)} min sin responder — considerá reiniciarlo desde la vista Red (acción manual, requiere confirmación).`
+    );
+  }
+  const descripcion = partes.filter(Boolean).join("\n\n");
 
   const ticket = await createTicket({
     titulo: `Alerta ${severidad} en ${alert.sitio}`,
@@ -95,7 +102,7 @@ async function triageAlert(alertId: string): Promise<void> {
 
 const worker = new Worker<TriageJobData>(
   "triage",
-  async (job) => triageAlert(job.data.alertId),
+  async (job) => triageAlert(job.data.alertId, job.data.notaPrevia),
   { connection: createRedisConnection() }
 );
 

@@ -17,7 +17,8 @@
     "worker:monitor": "tsx watch --env-file=.env src/workers/worker-monitor.ts",
     "worker:triage": "tsx watch --env-file=.env src/workers/worker-triage.ts",
     "worker:remediation": "tsx watch --env-file=.env src/workers/worker-remediation.ts",
-    "worker:ticket-followup": "tsx watch --env-file=.env src/workers/worker-ticket-followup.ts"
+    "worker:ticket-followup": "tsx watch --env-file=.env src/workers/worker-ticket-followup.ts",
+    "worker:autoremediate": "tsx watch --env-file=.env src/workers/worker-autoremediate.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

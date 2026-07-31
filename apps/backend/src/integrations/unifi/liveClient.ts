@@ -228,6 +228,25 @@ export class UnifiLiveClient implements UnifiClient {
   }
 
   /**
+   * Fuera del contrato `UnifiClient` a propósito: re-adopción es un
+   * concepto específico de UniFi (dispositivos WiFi/red) sin equivalente en
+   * OPNsense, que implementa la misma interfaz — ver
+   * services/autoRemediation.service.ts, el único llamador, que hace
+   * `instanceof UnifiLiveClient` antes de usar estos dos métodos.
+   */
+  async listPendingDevices() {
+    const integrationClient = await this.getIntegrationClient();
+    return integrationClient.listPendingDevices();
+  }
+
+  /** Re-adopta por MAC (no por id — un device pendiente todavía no tiene id de sitio). Devuelve el nodo ya normalizado. */
+  async adoptDevice(macAddress: string): Promise<NetworkNode> {
+    const [integrationClient, siteId] = await Promise.all([this.getIntegrationClient(), this.getIntegrationSiteId()]);
+    const device = await integrationClient.adoptDevice(siteId, macAddress);
+    return normalizeIntegrationDevice(device, this.config.site, undefined, 0, []);
+  }
+
+  /**
    * Reasigna la VLAN de un SSID ya existente vía la Integration API. NO crea
    * SSIDs ni redes (Networks) nuevas: el PUT de esta API exige el objeto
    * completo (incluida `securityConfiguration`), y NetBot no tiene de dónde

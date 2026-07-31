@@ -30,6 +30,24 @@ const EnvSchema = z.object({
   // false a propósito para no romper por TLS al primer intento.
   UNIFI_OS_VERIFY_TLS: z.coerce.boolean().default(false),
 
+  // Auto-remediación (ver services/autoRemediation.service.ts): qué tipos
+  // de dispositivo puede auto-reiniciar/re-adoptar sin confirmación humana.
+  // Política controlada por Admin (config, no rol de usuario — la acción la
+  // dispara el sistema, no hay nadie autenticado en ese momento). Default
+  // acotado a AP: reiniciar un switch/gateway sin confirmación corta todo
+  // el sitio, demasiado riesgo para arrancar. Admin puede ampliarlo acá.
+  AUTO_REMEDIATE_DEVICE_TYPES: z
+    .string()
+    .default("AP")
+    .transform((s) => new Set(s.split(",").map((t) => t.trim().toUpperCase()).filter(Boolean))),
+  // Cooldown: no reintentar auto-remediación sobre el mismo dispositivo
+  // antes de este tiempo, para no quedar reintentando en loop uno que está
+  // flapping — escala directo a ticket para técnico en su lugar.
+  AUTO_REMEDIATE_COOLDOWN_MINUTES: z.coerce.number().int().positive().default(30),
+  // Cuánto esperar después de cada intento (reboot, luego re-adopción) antes
+  // de releer el estado y decidir si funcionó.
+  AUTO_REMEDIATE_WAIT_SECONDS: z.coerce.number().int().positive().default(90),
+
   OPNSENSE_MODE: z.enum(["mock", "live"]).default("mock"),
   OPNSENSE_HOST: z.string().optional(),
   OPNSENSE_API_KEY: z.string().optional(),

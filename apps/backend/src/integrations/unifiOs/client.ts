@@ -23,6 +23,16 @@ export interface UnifiOsDeviceLatestStatistics {
   lastHeartbeatAt?: string;
 }
 
+export interface UnifiOsPendingDevice {
+  macAddress: string;
+  model: string;
+  ipAddress: string;
+  state: string;
+  features: Array<"switching" | "accessPoint" | "gateway">;
+  /** Sitios a los que este device puede adoptarse — verificar que incluya el nuestro antes de intentar. */
+  adoptionTargetSiteIds: string[];
+}
+
 export interface UnifiOsConnectedClient {
   id: string;
   type: string;
@@ -182,6 +192,31 @@ export class UnifiOsClient {
 
   async listDevices(siteId: string): Promise<UnifiOsDevice[]> {
     return this.requestAllPages<UnifiOsDevice>(`/proxy/network/integration/v1/sites/${siteId}/devices`);
+  }
+
+  /** A diferencia de listDevices, NO está bajo /sites/{siteId} — un device pendiente todavía no pertenece a ningún sitio. */
+  async listPendingDevices(): Promise<UnifiOsPendingDevice[]> {
+    return this.requestAllPages<UnifiOsPendingDevice>("/proxy/network/integration/v1/pending-devices");
+  }
+
+  /**
+   * Re-adopta un device que ya perteneció al sitio y volvió a aparecer como
+   * pendiente (ej. tras un power-cycle que perdió su config de inform URL).
+   * `ignoreDeviceLimit: false` a propósito — si el sitio está en el límite
+   * de licencias, preferimos que falle explícito antes que forzarlo en
+   * silencio (mismo criterio que el resto de las escrituras automáticas de
+   * este cliente, ver writeWifiNetwork).
+   */
+  async adoptDevice(siteId: string, macAddress: string): Promise<UnifiOsDevice> {
+    // Sin confirmar contra hardware real (no se puede probar sin desconectar
+    // un device real a propósito) — se asume "objeto directo, no envuelto",
+    // igual que el resto de los endpoints de recurso singular de esta API
+    // (getWifiBroadcastDetail/updateWifiBroadcast), a diferencia de los
+    // listados paginados que sí envuelven en {data:...}.
+    return this.requestJson<UnifiOsDevice>(`/proxy/network/integration/v1/sites/${siteId}/devices`, {
+      method: "POST",
+      body: { macAddress, ignoreDeviceLimit: false },
+    });
   }
 
   async listClients(siteId: string): Promise<UnifiOsConnectedClient[]> {

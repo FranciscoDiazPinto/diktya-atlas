@@ -41,10 +41,12 @@ export interface UnifiClient {
   listAlerts(sitio?: string): Promise<Alert[]>;
   writeWifiNetwork(input: WriteWifiNetworkInput): Promise<WifiNetwork>;
   /**
-   * Reinicio remoto de un dispositivo. Nunca se llama automático desde un
-   * worker — solo desde routes/network.ts, detrás de rol y con
-   * confirmación explícita del técnico en el frontend (ver
-   * services/network.service.ts::rebootNode).
+   * Reinicio remoto de un dispositivo. Dos llamadores, ambos con guardas
+   * propias: routes/network.ts (rol + confirmación explícita del técnico
+   * en el frontend, ver services/network.service.ts::rebootNode) y, desde
+   * el 2026-07-31, services/autoRemediation.service.ts (automático, pero
+   * acotado por tipo de dispositivo vía AUTO_REMEDIATE_DEVICE_TYPES +
+   * cooldown + el mismo lock distribuido que el camino manual).
    */
   rebootNode(nodeId: string): Promise<void>;
 }
