@@ -16,6 +16,15 @@ function esperar(ms: number): Promise<void> {
 type Resultado =
   | { tipo: "ya_recuperado"; pasos: string[] }
   | { tipo: "reset_exitoso"; pasos: string[] }
+  /**
+   * Volvió online durante la espera, pero el comando de reset había
+   * fallado (confirmado contra hardware real: la Integration API devuelve
+   * 422 al pedir RESTART de un device que ya figura offline — no hay canal
+   * abierto para entregarle el comando). Sin este caso separado, un blip
+   * de red coincidente con la ventana de espera se etiquetaba como
+   * "reset exitoso" cuando el reset en realidad nunca funcionó.
+   */
+  | { tipo: "recuperado_solo"; pasos: string[] }
   | { tipo: "readopcion_exitosa"; pasos: string[]; nuevoExternalId: string }
   | { tipo: "fallido"; pasos: string[] };
 
@@ -83,10 +92,15 @@ export async function processAutoRemediation(data: AutoRemediateJobData): Promis
   }
 
   const requiereRevisionConfig = resultado.tipo === "readopcion_exitosa";
+  const tituloAccion = resultado.tipo === "recuperado_solo" ? "Recuperado (sin intervención efectiva)" : "Auto-remediado";
+  const resumen =
+    resultado.tipo === "recuperado_solo"
+      ? `El dispositivo "${node.nombre}" (${node.sitio}) volvió a responder solo — el intento de reset automático falló, no fue lo que lo recuperó.`
+      : `El dispositivo "${node.nombre}" (${node.sitio}) se recuperó automáticamente.`;
   const ticket = await createTicket({
-    titulo: `Auto-remediado: "${node.nombre}" en ${node.sitio}`,
+    titulo: `${tituloAccion}: "${node.nombre}" en ${node.sitio}`,
     descripcion: [
-      `El dispositivo "${node.nombre}" (${node.sitio}) se recuperó automáticamente.`,
+      resumen,
       `Pasos: ${resultado.pasos.join(" → ")}.`,
       requiereRevisionConfig
         ? "Se re-adoptó el dispositivo — verificar manualmente que conservó su configuración (SSIDs, VLAN asignada); la re-adopción no está validada contra hardware real todavía."
@@ -121,9 +135,11 @@ async function intentarRecuperar(
     return { tipo: "ya_recuperado", pasos };
   }
 
+  let resetComandoExitoso = false;
   try {
     await client.rebootNode(node.externalId);
     pasos.push("reset enviado");
+    resetComandoExitoso = true;
   } catch (err) {
     pasos.push(`reset falló: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -132,8 +148,12 @@ async function intentarRecuperar(
 
   const trasReset = await client.getNodeDetail(node.externalId);
   if (trasReset?.status === "online") {
-    pasos.push("volvió online tras el reset");
-    return { tipo: "reset_exitoso", pasos };
+    if (resetComandoExitoso) {
+      pasos.push("volvió online tras el reset");
+      return { tipo: "reset_exitoso", pasos };
+    }
+    pasos.push("volvió online durante la espera, pero el comando de reset había fallado — no fue el reset lo que lo recuperó");
+    return { tipo: "recuperado_solo", pasos };
   }
   pasos.push(`seguía sin responder tras esperar ${env.AUTO_REMEDIATE_WAIT_SECONDS}s`);
 
