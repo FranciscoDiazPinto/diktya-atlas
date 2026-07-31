@@ -107,9 +107,26 @@ dedicada.
 - **Reporte de actividad (`GET /reports/digest`) agregado (2026-07-30), con sección "Actividad"
   en `/red` desde el 2026-07-31** — alertas/tickets (+tiempo de resolución)/auditoría/reservas
   VLAN por rango de fechas (Hoy/Ayer/Últimos 7 días), stat tiles + tabla de auditoría por worker.
-  Deliberadamente NO es uptime real (`NetworkNode` solo guarda el estado actual, se sobreescribe
-  en cada sync) — un reporte de uptime por dispositivo necesitaría una tabla de historial de
-  estado + cambios en el worker, sin construir todavía.
+- **Auto-remediación: notifica también en éxito si el corte fue largo (2026-07-31)** —
+  antes solo avisaba por Telegram al escalar (reset + re-adopción fallidos); un corte que se
+  autoresolvía justo antes de actuar quedaba con la misma visibilidad cero que un blip de 90s.
+  Nuevo `AUTO_REMEDIATE_NOTIFY_THRESHOLD_MINUTES` (default 5): si la duración total offline llega
+  al umbral, notifica igual aunque el reset haya funcionado (ADVERTENCIA, "resuelto, sin acción
+  necesaria" en vez de problema en curso). Bajo el umbral, el ticket INFO sigue quedando como
+  registro completo, solo que sin avisar a nadie.
+- **Dashboard de disponibilidad en `/infra` (solo Admin), agregado 2026-07-31** — nuevo modelo
+  `NodeStatusEvent` (un registro por cambio de estado real, no por poll), a partir del cual se
+  calcula % de disponibilidad por nodo/promedio, serie temporal de "historial de conexión" e
+  histograma de duración de cortes (`GET /reports/availability`, gateado
+  `requireRole("ADMIN")` igual que `/opnsense/status`). Resuelve la limitación anterior (uptime
+  real no existía, `NetworkNode` solo guardaba el estado actual). "Sin datos" se distingue de 0%
+  explícitamente para los tramos anteriores al primer evento conocido de un nodo. Velocidad de
+  internet quedó deliberadamente afuera — no hay integración OPNsense real ni mecanismo de
+  speedtest, decisión explícita del usuario de no construir sobre una base inexistente. Sin
+  librería de gráficos en el frontend: los charts (línea/área e histograma) son SVG a mano
+  siguiendo la skill de dataviz del repo. Se hizo backfill manual de un evento baseline para los 7
+  nodos ya existentes en Postgres (si no, quedaban en "sin datos" hasta su primer cambio de estado
+  real tras el deploy).
 - **Notificaciones Telegram: corregidas y probadas en real (2026-07-30)** — tenían un bug real
   (chat_id hardcodeado a un placeholder). Ahora requiere `TELEGRAM_BOT_TOKEN` +
   `TELEGRAM_CHAT_ID` juntas.
