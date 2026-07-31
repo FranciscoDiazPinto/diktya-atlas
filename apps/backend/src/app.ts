@@ -60,6 +60,15 @@ export function buildApp(): FastifyInstance {
     if ((err as { code?: string }).code === "FST_REQ_FILE_TOO_LARGE") {
       return reply.code(413).send({ error: "El archivo supera el tamaño máximo permitido (50MB)" });
     }
+    // @fastify/rate-limit tira un Error plano con `.statusCode = 429` (no una
+    // clase distinguible por `instanceof`) — sin este caso caía al 500
+    // genérico de abajo, indistinguible para el cliente de un error real
+    // (confirmado en vivo: el frontend mostraba "Error interno" en vez de
+    // avisar que había que esperar).
+    const maybeRateLimitErr = err as { statusCode?: number; message?: string };
+    if (maybeRateLimitErr.statusCode === 429) {
+      return reply.code(429).send({ error: maybeRateLimitErr.message ?? "Demasiadas solicitudes" });
+    }
     app.log.error(err);
     return reply.code(500).send({ error: "Error interno" });
   });
