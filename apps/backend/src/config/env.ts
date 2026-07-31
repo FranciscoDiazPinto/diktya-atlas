@@ -47,6 +47,12 @@ const EnvSchema = z.object({
   // Cuánto esperar después de cada intento (reboot, luego re-adopción) antes
   // de releer el estado y decidir si funcionó.
   AUTO_REMEDIATE_WAIT_SECONDS: z.coerce.number().int().positive().default(90),
+  // Si terminó bien (se recuperó solo o gracias al reset/re-adopción) pero
+  // estuvo offline más de esto, notificar por Telegram igual — un corte de
+  // 20 minutos que se auto-resolvió justo antes de que actuáramos no debe
+  // quedar tan silencioso como uno de 90 segundos. Por debajo del umbral,
+  // solo queda el ticket INFO (auditoría), sin notificación.
+  AUTO_REMEDIATE_NOTIFY_THRESHOLD_MINUTES: z.coerce.number().int().positive().default(5),
 
   OPNSENSE_MODE: z.enum(["mock", "live"]).default("mock"),
   OPNSENSE_HOST: z.string().optional(),

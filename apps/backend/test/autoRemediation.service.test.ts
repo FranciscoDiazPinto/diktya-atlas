@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+const { notifyTechnicians } = vi.hoisted(() => ({ notifyTechnicians: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("../src/services/notification.service.js", () => ({ notifyTechnicians }));
+
 import { prisma } from "../src/db/client.js";
 import { getUnifiClient, MockUnifiClient } from "../src/integrations/unifi/index.js";
 import { processAutoRemediation } from "../src/services/autoRemediation.service.js";
@@ -26,6 +30,7 @@ describe("autoRemediation.service", () => {
   }
 
   beforeEach(async () => {
+    notifyTechnicians.mockClear();
     seedMockNode("offline");
 
     const node = await prisma.networkNode.create({
@@ -86,5 +91,28 @@ describe("autoRemediation.service", () => {
 
     const node = await prisma.networkNode.findUniqueOrThrow({ where: { id: nodeId } });
     expect(node.lastAutoRemediationAt).not.toBeNull();
+  });
+
+  it("éxito con corte breve (recién detectado): no notifica, solo queda el ticket INFO", async () => {
+    seedMockNode("online"); // se recuperó solo, alertId recién creado en beforeEach (createdAt ~ahora)
+
+    await processAutoRemediation({ nodeId, alertId });
+
+    expect(notifyTechnicians).not.toHaveBeenCalled();
+  });
+
+  it("éxito con corte largo (por encima del umbral, default 5 min): notifica igual aunque haya terminado bien", async () => {
+    await prisma.alert.update({
+      where: { id: alertId },
+      data: { createdAt: new Date(Date.now() - 10 * 60_000) }, // 10 min atrás > umbral default
+    });
+    seedMockNode("online"); // se recuperó solo
+
+    await processAutoRemediation({ nodeId, alertId });
+
+    expect(notifyTechnicians).toHaveBeenCalledTimes(1);
+    const [args] = notifyTechnicians.mock.calls[0];
+    expect(args.severidad).toBe("ADVERTENCIA");
+    expect(args.mensaje).toContain("10 min");
   });
 });

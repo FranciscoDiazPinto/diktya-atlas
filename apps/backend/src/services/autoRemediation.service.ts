@@ -4,6 +4,7 @@ import { UnifiLiveClient } from "../integrations/unifi/liveClient.js";
 import { withLock, LockAcquisitionError } from "./lock.service.js";
 import { recordAudit } from "./audit.service.js";
 import { createTicket, resolveTicket } from "./ticket.service.js";
+import { notifyTechnicians } from "./notification.service.js";
 import { publishRealtimeEvent } from "../realtime/hub.js";
 import { env } from "../config/env.js";
 import { triageQueue } from "../workers/queues.js";
@@ -55,6 +56,10 @@ export async function processAutoRemediation(data: AutoRemediateJobData): Promis
     console.warn(`[worker-autoremediate] nodo ${data.nodeId} no encontrado`);
     return;
   }
+  // Para medir cuánto duró la caída (createdAt = cuando nodeSync detectó la
+  // transición a offline, no cuando arrancó este job) — determina si un
+  // éxito igual amerita avisar por Telegram, ver más abajo.
+  const alert = await prisma.alert.findUnique({ where: { id: data.alertId } });
 
   // Se marca ANTES de intentar, sin importar el resultado — el cooldown
   // (ver nodeSync.service.ts::isElegibleParaAutoRemediacion) tiene que
@@ -97,10 +102,15 @@ export async function processAutoRemediation(data: AutoRemediateJobData): Promis
     resultado.tipo === "recuperado_solo"
       ? `El dispositivo "${node.nombre}" (${node.sitio}) volvió a responder solo — el intento de reset automático falló, no fue lo que lo recuperó.`
       : `El dispositivo "${node.nombre}" (${node.sitio}) se recuperó automáticamente.`;
+
+  const duracionMinutos = alert ? Math.round((Date.now() - alert.createdAt.getTime()) / 60_000) : null;
+  const corteLargo = duracionMinutos !== null && duracionMinutos >= env.AUTO_REMEDIATE_NOTIFY_THRESHOLD_MINUTES;
+
   const ticket = await createTicket({
     titulo: `${tituloAccion}: "${node.nombre}" en ${node.sitio}`,
     descripcion: [
       resumen,
+      duracionMinutos !== null ? `Estuvo offline ${duracionMinutos} min antes de recuperarse.` : null,
       `Pasos: ${resultado.pasos.join(" → ")}.`,
       requiereRevisionConfig
         ? "Se re-adoptó el dispositivo — verificar manualmente que conservó su configuración (SSIDs, VLAN asignada); la re-adopción no está validada contra hardware real todavía."
@@ -114,6 +124,18 @@ export async function processAutoRemediation(data: AutoRemediateJobData): Promis
   await resolveTicket(ticket.id);
   await prisma.alert.update({ where: { id: data.alertId }, data: { ticketId: ticket.id } });
   await publishRealtimeEvent({ type: "ticket_updated", payload: ticket });
+
+  // Por debajo del umbral, el ticket INFO (auditoría) alcanza — no vale la
+  // pena interrumpir a nadie por un blip de 90 segundos. Un corte largo que
+  // se auto-resolvió justo antes de que actuáramos sí amerita aviso, o
+  // queda con la misma visibilidad que uno de unos segundos.
+  if (corteLargo) {
+    await notifyTechnicians({
+      mensaje: `"${node.nombre}" en ${node.sitio} estuvo offline ${duracionMinutos} min y se recuperó (${tituloAccion.toLowerCase()}) — sin acción pendiente, solo aviso.`,
+      severidad: "ADVERTENCIA",
+      sitio: node.sitio,
+    });
+  }
 
   await recordAudit({
     workerName: "worker-autoremediate",
