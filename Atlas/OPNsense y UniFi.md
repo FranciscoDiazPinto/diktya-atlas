@@ -1,6 +1,6 @@
 ---
 tags: [atlas, netbot, opnsense, unifi]
-updated: 2026-07-30 (noche)
+updated: 2026-07-31
 ---
 
 # OPNsense y UniFi (en el software)
@@ -70,6 +70,54 @@ que ya existe (`soporteFD`) — pendiente decisión de conectarlo de verdad. Rea
 alcanzable** desde el equipo de desarrollo — desactualizado desde 2026-07-29, ver
 [[Infraestructura Real]]/[[Rutas de Red]] para el detalle del camino (port-forward de facto en
 CORE-01, no la ruta WireGuard diseñada).
+
+## Dashboard de disponibilidad (2026-07-31)
+
+Sección nueva arriba de las cards operativas en `/infra` — a diferencia del resto del panel (que
+es estado en vivo), esto es **histórico**: disponibilidad real por rango de fechas, no una foto de
+ahora.
+
+**Modelo nuevo, `NodeStatusEvent`** — un registro por *cambio* de estado de un nodo (no por poll;
+`nodeSync.service.ts` lo inserta solo cuando `status` difiere del sync anterior, incluido el primer
+sync de un nodo nuevo, que cuenta como el punto de partida de su historial). `NetworkNode.status`
+seguía siendo la foto actual sin historial — esto le agrega la serie temporal que faltaba.
+
+`nodeAvailability.service.ts` reconstruye, caminando la línea de tiempo de eventos de cada nodo:
+- **% de disponibilidad** por nodo y promedio general.
+- **Serie temporal** (48 puntos muestreados en el rango) — % de nodos online en cada momento, para
+  el chart de "historial de conexión".
+- **Histograma de duración de cortes** (`< 1 min` / `1–5 min` / `5–15 min` / `15–60 min` / `> 1 h`).
+
+**"Sin datos" ≠ 0%** — el tramo antes del primer evento conocido de un nodo (o, si nunca tuvo
+ningún evento, todo el rango) se excluye del cálculo en vez de contar como downtime. Si no hay
+ningún nodo con datos en el rango, el promedio general también es `null`, no `0`.
+
+`GET /reports/availability` — gateado `requireRole("ADMIN")`, mismo criterio que `/opnsense/status`
+y `/unifi-os/status` (los otros endpoints que alimentan `/infra`); a diferencia de esos, sí lee de
+Postgres (vía `NodeStatusEvent`), no en vivo del controlador.
+
+**Backfill manual (2026-07-31)**: los 7 nodos que ya existían en Postgres antes de esta migración
+no tenían ningún `NodeStatusEvent` — sin backfill hubieran quedado en "sin datos" indefinidamente
+hasta su primer cambio de estado real post-deploy (que puede tardar días si nada se cae). Se
+insertó un evento baseline (su `status` actual, timestamp del backfill) para los 7 vía script
+puntual, mismo criterio que "primer sync de un nodo nuevo".
+
+**Sin librería de gráficos** (`apps/frontend/package.json` no tiene recharts/d3/visx/victory) — el
+chart de línea/área (`ConnectionHistoryChart.tsx`) y el histograma (`OutageHistogramChart.tsx`) son
+SVG a mano siguiendo la skill de dataviz del repo (2px línea, ~10% opacity el fill de área, barras
+con 4px de radio, gridlines hairline, crosshair + tooltip por barra, fallback de tabla). Los huecos
+"sin datos" cortan el path en tramos en vez de interpolar a través de ellos.
+
+**Bug real encontrado en la verificación visual**: un tramo de un solo punto (caso común recién
+después del backfill/deploy, cuando casi todo el rango pedido todavía es "sin datos" y solo el
+último instante tiene dato) no pintaba nada — un `path` con un solo `M x y` sin `L` es invisible.
+Se corrigió agregando un marcador (dot) permanente en el último punto de cada tramo, no solo al
+hacer hover.
+
+**Velocidad de internet quedó deliberadamente afuera** — no hay integración OPNsense real ni
+mecanismo de speedtest en el código (ver más arriba, "Decisión de alcance explícita"), así que no
+había datos sobre los que construir ese gráfico. Decisión explícita del usuario de no construirlo
+sobre una base inexistente en vez de simularlo.
 
 ## "Solicitar cambio"
 

@@ -52,7 +52,7 @@ Ver [[Roles y permisos]] y `SECURITY.md` en el repo para la matriz completa.
 | Red | `/red` | Todos | Estado UniFi: nodos, alertas, detalle de AP |
 | Tickets | `/tickets` | Todos (crear: Admin/Técnico) | Incidentes, resolución/reapertura |
 | Planos | `/planos` | Todos (editar: Admin/Técnico) | Mapeo de cobertura, ver [[Mapeo de planos y cobertura]] |
-| Infraestructura | `/infra` | Solo Admin | Estado OPNsense/UniFi + "solicitar cambio", ver [[OPNsense y UniFi]] |
+| Infraestructura | `/infra` | Solo Admin | Estado OPNsense/UniFi + dashboard de disponibilidad + "solicitar cambio", ver [[OPNsense y UniFi]] |
 
 Nav en sidebar colapsable (persiste preferencia en localStorage).
 
