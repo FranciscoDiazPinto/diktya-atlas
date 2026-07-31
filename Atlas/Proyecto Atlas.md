@@ -1,6 +1,6 @@
 ---
 tags: [atlas, netbot, documentacion]
-updated: 2026-07-30
+updated: 2026-07-30 (noche)
 ---
 
 # Diktya Atlas — NetBot
@@ -83,6 +83,25 @@ Tres roles (`ADMIN`, `TECNICO`, `VISUALIZADOR`), filtrados en dos capas (tools d
 backend), auth real con JWT+refresh+TOTP 2FA. Matriz completa y detalle de auth → ver la nota
 dedicada.
 
+## ⚠️ Pendiente urgente para la próxima sesión
+
+**El chat responde mal sobre el estado real de la red.** Probado el 2026-07-30 de noche:
+preguntando "hay algún AP arriba para conectarme??", el bot respondió que no hay ningún AP
+online ni dispositivos activos — **falso**, `U6 IW` está online (confirmado por `/red` y por
+`/network/status` directo). La tool `get_network_status` lee exactamente la misma fuente
+(`getNetworkStatusSummary`, Postgres) que ya se confirmó correcta — así que el problema está en
+el LLM, no en los datos. Hipótesis sin confirmar (quedó interrumpido antes de reproducir):
+1. El modelo gratis de OpenRouter (`openai/gpt-oss-20b:free`) no está invocando la tool de
+   verdad y alucina la respuesta.
+2. El LLM pasa un argumento `sitio` (ej. `"oficina-central"`, el de los nodos mock ya borrados)
+   que no matchea el `sitio: "default"` de los nodos reales — resultado vacío pero real, y el
+   bot lo reporta "honestamente" mal interpretado.
+
+**Primer paso para retomar**: `curl -X POST http://localhost:3000/chat -H "Content-Type:
+application/json" -H "x-role: VISUALIZADOR" -H "x-user-id: test" -d '{"message": "hay algun ap
+arriba?"}'` e inspeccionar el campo `toolResults` de la respuesta — ahí se ve el argumento
+exacto que mandó el LLM y qué le devolvió la tool.
+
 ## Estado actual / pendientes conocidos
 
 - Cliente OPNsense real: no implementado (mock funcional, ver [[OPNsense y UniFi]]).
@@ -94,8 +113,22 @@ dedicada.
   14B/32B-Instruct por tool-calling nativo confiable en español).
 - Detección de stands por visión: diseñado, no implementado (ver [[Detección de stands por vision]]).
 - **UniFi WLANs/nodos/reboot: migrados a la Integration API real y validados contra hardware real
-  (2026-07-30)** — ver [[OPNsense y UniFi]]. `UNIFI_MODE` sigue en `mock` — pendiente pasar a
-  `live` cuando se llegue al milestone de revisión de seguridad (ver [[Infraestructura Real]]).
+  (2026-07-30)** — ver [[OPNsense y UniFi]].
+- **`UNIFI_MODE=live` está ACTIVO desde la noche del 2026-07-30** (antes era `mock`, ver
+  [[OPNsense y UniFi]]) — `/red` muestra los 7 dispositivos reales (los 2 nodos mock de demo se
+  borraron de Postgres). Reboot real y escritura real de VLAN (`DIKTYA-MNG`) quedan habilitados
+  si algo los dispara — sin milestone de revisión de seguridad todavía, decisión explícita del
+  usuario de avanzar igual para pruebas. Backend corriendo en background al cierre de la sesión
+  — confirmar al retomar si sigue arriba o hay que levantarlo de nuevo.
+- **Tipo de dispositivo (AP/Switch/Gateway/UPS) con íconos en `/red` (2026-07-30)** — campo real
+  `tipoDispositivo`, clasificado server-side desde `features` de la Integration API + casos
+  especiales por nombre de modelo (UPS y el gateway real no traen el feature esperado).
+- **Reporte de actividad (`GET /reports/digest`) agregado (2026-07-30)** — alertas/tickets
+  (+tiempo de resolución)/auditoría/reservas VLAN por rango de fechas, sin cambios de schema.
+  Deliberadamente NO es uptime real (`NetworkNode` solo guarda el estado actual, se sobreescribe
+  en cada sync) — un reporte de uptime por dispositivo necesitaría una tabla de historial de
+  estado + cambios en el worker, sin construir todavía. Sin UI en el frontend todavía, solo
+  backend+test.
 - **Notificaciones Telegram: corregidas y probadas en real (2026-07-30)** — tenían un bug real
   (chat_id hardcodeado a un placeholder). Ahora requiere `TELEGRAM_BOT_TOKEN` +
   `TELEGRAM_CHAT_ID` juntas.

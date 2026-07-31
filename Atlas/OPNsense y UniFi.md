@@ -1,6 +1,6 @@
 ---
 tags: [atlas, netbot, opnsense, unifi]
-updated: 2026-07-30
+updated: 2026-07-30 (noche)
 ---
 
 # OPNsense y UniFi (en el software)
@@ -11,10 +11,19 @@ frontend, no solo botón oculto). No confundir con la infraestructura real — v
 
 ## UniFi
 
-Cliente real vs. mock intercambiable por `UNIFI_MODE` (`mock` por defecto, sigue así — pendiente
-pasar a `live` cuando se llegue al milestone de revisión de seguridad, ver [[Infraestructura Real]]).
+Cliente real vs. mock intercambiable por `UNIFI_MODE`. **Pasó a `live` la noche del 2026-07-30**
+(antes `mock` por defecto) — decisión explícita del usuario, sin esperar al milestone de
+revisión de seguridad (ese milestone sigue pendiente, ver [[Infraestructura Real]] § gobernanza).
+Con esto: reboot real y escritura real de VLAN quedan habilitados si algo los dispara desde la
+app (botón en `/red`, o `apply_vlan_plan` desde el chat). Los 2 nodos mock de demo (`AP
+Recepción`/`AP Bodega`) se borraron de Postgres esa misma noche — `/red` ya muestra solo los 7
+dispositivos reales, con íconos por tipo (`tipoDispositivo`: AP/SWITCH/GATEWAY/UPS).
+
 El estado que se ve en `/red` (todos los roles) viene de **Postgres**, sincronizado desde el
-cliente (`worker-monitor`) — no se lee en vivo del controlador en cada request.
+cliente (`worker-monitor`) — no se lee en vivo del controlador en cada request. Al cierre de la
+sesión del 2026-07-30, `worker-monitor` (y el resto de los workers) **no estaban corriendo
+continuo** — solo se hizo una sincronización manual puntual. Confirmar al retomar si hace falta
+levantarlos.
 
 **Migración 2026-07-30 — WLANs, nodos y reboot pasaron a la Integration API real** (antes
 `integrations/unifi/liveClient.ts` completo usaba la API clásica, cookie + `/api/s/{site}/...`,
