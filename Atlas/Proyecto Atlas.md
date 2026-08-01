@@ -114,6 +114,14 @@ dedicada.
   al umbral, notifica igual aunque el reset haya funcionado (ADVERTENCIA, "resuelto, sin acción
   necesaria" en vez de problema en curso). Bajo el umbral, el ticket INFO sigue quedando como
   registro completo, solo que sin avisar a nadie.
+- **Doc interactiva de la API (Swagger UI) en `/docs`, agregada 2026-07-31** — `@fastify/swagger` +
+  `@fastify/swagger-ui`, reusando los mismos schemas Zod que cada ruta ya usaba para `.parse()` a
+  mano (convertidos con `zod-to-json-schema`, ya era dependencia). No cambia la validación en
+  runtime: cada ruta documentada lleva `attachValidation: true`, así que Fastify nunca corta la
+  request con su propio formato de error — el `.parse()` manual en el handler sigue siendo la
+  única fuente de verdad. Sin schemas de respuesta a propósito (evita el riesgo de que el
+  serializer de Fastify recorte campos reales de la respuesta si el schema no calza exacto con
+  ~40 endpoints). Solo montada cuando `NODE_ENV !== "production"`.
 - **Dashboard de disponibilidad en `/infra` (solo Admin), agregado 2026-07-31** — nuevo modelo
   `NodeStatusEvent` (un registro por cambio de estado real, no por poll), a partir del cual se
   calcula % de disponibilidad por nodo/promedio, serie temporal de "historial de conexión" e
