@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { authenticate, requireRole } from "../auth/middleware.js";
 import { getUnifiOsStatus } from "../services/unifiOsStatus.service.js";
+import { routeDocs } from "../lib/openapi.js";
 
 /**
  * Estado real (no mock) de un UniFi OS vía su API de integraciones, de
@@ -11,7 +12,18 @@ import { getUnifiOsStatus } from "../services/unifiOsStatus.service.js";
 export async function unifiOsRoutes(fastify: FastifyInstance) {
   fastify.addHook("preHandler", authenticate);
 
-  fastify.get("/unifi-os/status", { preHandler: requireRole("ADMIN") }, async (_request, reply) => {
-    return reply.send(await getUnifiOsStatus());
-  });
+  fastify.get(
+    "/unifi-os/status",
+    {
+      preHandler: requireRole("ADMIN"),
+      schema: routeDocs({
+        summary: "Estado real de un UniFi OS (UDM/UDR) vía su API de integraciones",
+        description: "Solo lectura — no expone WLANs ni alarmas (esa API no las tiene todavía).",
+        tags: ["Infraestructura"],
+      }),
+    },
+    async (_request, reply) => {
+      return reply.send(await getUnifiOsStatus());
+    }
+  );
 }

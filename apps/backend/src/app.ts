@@ -6,6 +6,8 @@ import rateLimit from "@fastify/rate-limit";
 import multipart from "@fastify/multipart";
 import websocketPlugin from "@fastify/websocket";
 import fastifyStatic from "@fastify/static";
+import swagger from "@fastify/swagger";
+import swaggerUi from "@fastify/swagger-ui";
 import { ZodError } from "zod";
 import { env } from "./config/env.js";
 import { HttpError } from "./lib/errors.js";
@@ -46,6 +48,45 @@ export function buildApp(): FastifyInstance {
   // planos reales (los PDF de eventos observados llegan a varios MB).
   app.register(multipart, { limits: { fileSize: 50 * 1024 * 1024 } });
   app.register(websocketPlugin);
+
+  // Doc interactiva de la API (Swagger UI). Reusa los mismos schemas Zod que
+  // cada ruta ya usa para `.parse()` a mano (ver lib/openapi.ts) — no cambia
+  // la validación en runtime, es puramente documentación. Nunca montada en
+  // producción: es superficie extra expuesta (lista completa de endpoints +
+  // shapes) que no aporta nada a un usuario final.
+  if (env.NODE_ENV !== "production") {
+    app.register(swagger, {
+      openapi: {
+        info: {
+          title: "NetBot API",
+          description:
+            "API del backend de Diktya Atlas / NetBot — gestión de redes de eventos (UniFi/OPNsense) orquestada por un LLM. " +
+            "La mayoría de las rutas requiere `Authorization: Bearer <accessToken>` (ver POST /auth/login). " +
+            "Los endpoints marcados sin candado son públicos.",
+          version: "0.1.0",
+        },
+        components: {
+          securitySchemes: {
+            bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+          },
+        },
+        tags: [
+          { name: "Auth", description: "Login, 2FA (TOTP), refresh de sesión" },
+          { name: "Chat", description: "Orquestador conversacional (LLM + tool-calling)" },
+          { name: "CSV", description: "Ingesta de CSV -> plan de VLANs" },
+          { name: "VLAN", description: "Reserva y aplicación de un plan de VLANs" },
+          { name: "Red", description: "Estado UniFi (nodos, diagnóstico, reboot)" },
+          { name: "Tickets", description: "Incidentes: creación, resolución, reapertura" },
+          { name: "Reportes", description: "Digest de actividad y disponibilidad" },
+          { name: "Infraestructura", description: "OPNsense y UniFi OS real — solo Admin" },
+          { name: "Eventos", description: "Despliegues de evento (ej. \"Expomin 2026\")" },
+          { name: "Zonas de evento", description: "Planos, calibración y APs por zona" },
+          { name: "Venues", description: "Recintos y su plano base" },
+        ],
+      },
+    });
+    app.register(swaggerUi, { routePrefix: "/docs" });
+  }
 
   app.setErrorHandler((err, _request, reply) => {
     if (err instanceof HttpError) {

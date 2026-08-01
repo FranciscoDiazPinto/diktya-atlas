@@ -3,6 +3,7 @@ import { z } from "zod";
 import { authenticate, requireRole } from "../auth/middleware.js";
 import { getActivityDigest } from "../services/activityDigest.service.js";
 import { getAvailability } from "../services/nodeAvailability.service.js";
+import { routeDocs } from "../lib/openapi.js";
 
 const DigestQuerySchema = z.object({
   desde: z.coerce.date().optional(),
@@ -25,26 +26,53 @@ function startOfToday(): Date {
 export async function reportRoutes(fastify: FastifyInstance) {
   fastify.addHook("preHandler", authenticate);
 
-  fastify.get("/reports/digest", async (request, reply) => {
-    const { desde, hasta, eventDeploymentId } = DigestQuerySchema.parse(request.query);
-    return reply.send(
-      await getActivityDigest({
-        desde: desde ?? startOfToday(),
-        hasta: hasta ?? new Date(),
-        eventDeploymentId,
-      })
-    );
-  });
+  fastify.get(
+    "/reports/digest",
+    {
+      attachValidation: true,
+      schema: routeDocs({
+        summary: "Digest de actividad por rango (alertas, tickets, VLANs, auditoría)",
+        description: "`desde`/`hasta` default a \"hoy\" si se omiten. Abierto a los 3 roles.",
+        tags: ["Reportes"],
+        querystring: DigestQuerySchema,
+      }),
+    },
+    async (request, reply) => {
+      const { desde, hasta, eventDeploymentId } = DigestQuerySchema.parse(request.query);
+      return reply.send(
+        await getActivityDigest({
+          desde: desde ?? startOfToday(),
+          hasta: hasta ?? new Date(),
+          eventDeploymentId,
+        })
+      );
+    }
+  );
 
   // Solo Admin — mismo criterio que /opnsense/status y /unifi-os/status,
   // los otros endpoints que alimentan /infra.
-  fastify.get("/reports/availability", { preHandler: requireRole("ADMIN") }, async (request, reply) => {
-    const { desde, hasta } = AvailabilityQuerySchema.parse(request.query);
-    return reply.send(
-      await getAvailability({
-        desde: desde ?? startOfToday(),
-        hasta: hasta ?? new Date(),
-      })
-    );
-  });
+  fastify.get(
+    "/reports/availability",
+    {
+      preHandler: requireRole("ADMIN"),
+      attachValidation: true,
+      schema: routeDocs({
+        summary: "Disponibilidad real por rango: % por nodo, serie temporal, histograma de cortes",
+        description:
+          "A partir de NodeStatusEvent (evento por cambio de estado real, no por poll). " +
+          "`disponibilidadPct: null` (no 0) para tramos sin ningún evento conocido todavía.",
+        tags: ["Reportes"],
+        querystring: AvailabilityQuerySchema,
+      }),
+    },
+    async (request, reply) => {
+      const { desde, hasta } = AvailabilityQuerySchema.parse(request.query);
+      return reply.send(
+        await getAvailability({
+          desde: desde ?? startOfToday(),
+          hasta: hasta ?? new Date(),
+        })
+      );
+    }
+  );
 }

@@ -15,6 +15,7 @@ import {
 } from "../auth/session.service.js";
 import { authenticate } from "../auth/middleware.js";
 import { recordAudit } from "../services/audit.service.js";
+import { routeDocs } from "../lib/openapi.js";
 
 const REFRESH_COOKIE_NAME = "refresh_token";
 const REFRESH_COOKIE_PATH = "/auth";
@@ -66,7 +67,20 @@ export async function authRoutes(fastify: FastifyInstance) {
 
   fastify.post(
     "/auth/login",
-    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    {
+      config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+      attachValidation: true,
+      schema: routeDocs({
+        summary: "Login con email + password",
+        description:
+          "Devuelve `status: \"ok\"` (+ accessToken) si el usuario no requiere 2FA, o " +
+          "`\"2fa_required\"`/`\"2fa_setup_required\"` (+ un purpose-token de un solo uso) si sí — " +
+          "ver /auth/2fa/setup, /auth/2fa/confirm y /auth/login/verify-totp.",
+        tags: ["Auth"],
+        auth: false,
+        body: LoginBodySchema,
+      }),
+    },
     async (request, reply) => {
       const { email, password } = LoginBodySchema.parse(request.body);
       const user = await prisma.user.findUnique({ where: { email } });
@@ -100,62 +114,98 @@ export async function authRoutes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.post("/auth/2fa/setup", async (request, reply) => {
-    const token = getBearerToken(request);
-    if (!token) return reply.code(401).send({ error: "Falta setupToken" });
+  fastify.post(
+    "/auth/2fa/setup",
+    {
+      schema: routeDocs({
+        summary: "Generar secret de TOTP (primer login de ADMIN/TECNICO)",
+        description:
+          "Requiere el `setupToken` devuelto por /auth/login en `Authorization: Bearer <setupToken>` — " +
+          "NO es un accessToken normal, es un purpose-token de un solo uso.",
+        tags: ["Auth"],
+        auth: false,
+      }),
+    },
+    async (request, reply) => {
+      const token = getBearerToken(request);
+      if (!token) return reply.code(401).send({ error: "Falta setupToken" });
 
-    let payload;
-    try {
-      payload = verifyPurposeToken(token, "2fa_setup");
-    } catch (err) {
-      const status = err instanceof InvalidPurposeTokenError ? 400 : 401;
-      return reply.code(status).send({ error: "setupToken inválido o expirado" });
+      let payload;
+      try {
+        payload = verifyPurposeToken(token, "2fa_setup");
+      } catch (err) {
+        const status = err instanceof InvalidPurposeTokenError ? 400 : 401;
+        return reply.code(status).send({ error: "setupToken inválido o expirado" });
+      }
+
+      const user = await prisma.user.findUniqueOrThrow({ where: { id: payload.sub } });
+      const secret = generateTotpSecret();
+      await prisma.user.update({ where: { id: user.id }, data: { totpSecret: secret } });
+
+      return reply.send({ secret, otpauthUrl: totpProvisioningUri(user.email, secret) });
     }
+  );
 
-    const user = await prisma.user.findUniqueOrThrow({ where: { id: payload.sub } });
-    const secret = generateTotpSecret();
-    await prisma.user.update({ where: { id: user.id }, data: { totpSecret: secret } });
+  fastify.post(
+    "/auth/2fa/confirm",
+    {
+      attachValidation: true,
+      schema: routeDocs({
+        summary: "Confirmar el setup de TOTP con el primer código generado",
+        description: "Mismo `setupToken` que /auth/2fa/setup, en `Authorization: Bearer <setupToken>`.",
+        tags: ["Auth"],
+        auth: false,
+        body: CodeBodySchema,
+      }),
+    },
+    async (request, reply) => {
+      const { code } = CodeBodySchema.parse(request.body);
+      const token = getBearerToken(request);
+      if (!token) return reply.code(401).send({ error: "Falta setupToken" });
 
-    return reply.send({ secret, otpauthUrl: totpProvisioningUri(user.email, secret) });
-  });
+      let payload;
+      try {
+        payload = verifyPurposeToken(token, "2fa_setup");
+      } catch (err) {
+        const status = err instanceof InvalidPurposeTokenError ? 400 : 401;
+        return reply.code(status).send({ error: "setupToken inválido o expirado" });
+      }
 
-  fastify.post("/auth/2fa/confirm", async (request, reply) => {
-    const { code } = CodeBodySchema.parse(request.body);
-    const token = getBearerToken(request);
-    if (!token) return reply.code(401).send({ error: "Falta setupToken" });
+      const user = await prisma.user.findUniqueOrThrow({ where: { id: payload.sub } });
+      if (!user.totpSecret) {
+        return reply.code(400).send({ error: "No hay un setup de 2FA en curso para este usuario" });
+      }
 
-    let payload;
-    try {
-      payload = verifyPurposeToken(token, "2fa_setup");
-    } catch (err) {
-      const status = err instanceof InvalidPurposeTokenError ? 400 : 401;
-      return reply.code(status).send({ error: "setupToken inválido o expirado" });
+      const valid = verifyTotpCode(code, user.totpSecret);
+      await recordAudit({
+        actorId: user.id,
+        workerName: "auth",
+        parametros: { accion: "2fa_confirm" },
+        resultado: { exitoso: valid },
+        exitoso: valid,
+      });
+      if (!valid) return reply.code(401).send({ error: "Código inválido" });
+
+      const confirmedUser = await prisma.user.update({ where: { id: user.id }, data: { totpEnabled: true } });
+      const { accessToken, refreshToken } = await issueSession(confirmedUser, requestMeta(request));
+      setRefreshCookie(reply, refreshToken);
+      return reply.send({ status: "ok", accessToken, user: toPublicUser(confirmedUser) });
     }
-
-    const user = await prisma.user.findUniqueOrThrow({ where: { id: payload.sub } });
-    if (!user.totpSecret) {
-      return reply.code(400).send({ error: "No hay un setup de 2FA en curso para este usuario" });
-    }
-
-    const valid = verifyTotpCode(code, user.totpSecret);
-    await recordAudit({
-      actorId: user.id,
-      workerName: "auth",
-      parametros: { accion: "2fa_confirm" },
-      resultado: { exitoso: valid },
-      exitoso: valid,
-    });
-    if (!valid) return reply.code(401).send({ error: "Código inválido" });
-
-    const confirmedUser = await prisma.user.update({ where: { id: user.id }, data: { totpEnabled: true } });
-    const { accessToken, refreshToken } = await issueSession(confirmedUser, requestMeta(request));
-    setRefreshCookie(reply, refreshToken);
-    return reply.send({ status: "ok", accessToken, user: toPublicUser(confirmedUser) });
-  });
+  );
 
   fastify.post(
     "/auth/login/verify-totp",
-    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    {
+      config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+      attachValidation: true,
+      schema: routeDocs({
+        summary: "Confirmar login con el código TOTP (2do paso, usuarios con 2FA ya habilitado)",
+        description: "`loginToken` devuelto por /auth/login, en `Authorization: Bearer <loginToken>`.",
+        tags: ["Auth"],
+        auth: false,
+        body: CodeBodySchema,
+      }),
+    },
     async (request, reply) => {
       const { code } = CodeBodySchema.parse(request.body);
       const token = getBearerToken(request);
@@ -186,42 +236,67 @@ export async function authRoutes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.post("/auth/refresh", async (request, reply) => {
-    const raw = request.cookies[REFRESH_COOKIE_NAME];
-    if (!raw) return reply.code(401).send({ error: "Sin sesión" });
+  fastify.post(
+    "/auth/refresh",
+    {
+      schema: routeDocs({
+        summary: "Rotar la sesión (refresh token) y obtener un accessToken nuevo",
+        description: "Usa la cookie httpOnly `refresh_token` (path /auth) — no va nada en el body.",
+        tags: ["Auth"],
+        auth: false,
+      }),
+    },
+    async (request, reply) => {
+      const raw = request.cookies[REFRESH_COOKIE_NAME];
+      if (!raw) return reply.code(401).send({ error: "Sin sesión" });
 
-    try {
-      const { refreshToken, user } = await rotateSession(raw, requestMeta(request));
-      setRefreshCookie(reply, refreshToken);
-      const accessToken = signAccessToken({ sub: user.id, role: user.role });
-      return reply.send({ status: "ok", accessToken, user: toPublicUser(user) });
-    } catch (err) {
-      clearRefreshCookie(reply);
-      if (err instanceof SessionReuseDetectedError) {
-        await recordAudit({
-          actorId: err.userId,
-          workerName: "auth",
-          parametros: { accion: "refresh_reuse_detected" },
-          resultado: { error: err.message },
-          exitoso: false,
-        });
-      } else if (!(err instanceof InvalidSessionError)) {
-        throw err;
+      try {
+        const { refreshToken, user } = await rotateSession(raw, requestMeta(request));
+        setRefreshCookie(reply, refreshToken);
+        const accessToken = signAccessToken({ sub: user.id, role: user.role });
+        return reply.send({ status: "ok", accessToken, user: toPublicUser(user) });
+      } catch (err) {
+        clearRefreshCookie(reply);
+        if (err instanceof SessionReuseDetectedError) {
+          await recordAudit({
+            actorId: err.userId,
+            workerName: "auth",
+            parametros: { accion: "refresh_reuse_detected" },
+            resultado: { error: err.message },
+            exitoso: false,
+          });
+        } else if (!(err instanceof InvalidSessionError)) {
+          throw err;
+        }
+        return reply.code(401).send({ error: "Sesión inválida, iniciá sesión de nuevo" });
       }
-      return reply.code(401).send({ error: "Sesión inválida, iniciá sesión de nuevo" });
     }
-  });
+  );
 
-  fastify.post("/auth/logout", async (request, reply) => {
-    const raw = request.cookies[REFRESH_COOKIE_NAME];
-    if (raw) await revokeSession(raw);
-    clearRefreshCookie(reply);
-    return reply.send({ status: "ok" });
-  });
+  fastify.post(
+    "/auth/logout",
+    {
+      schema: routeDocs({
+        summary: "Cerrar sesión (revoca el refresh token actual)",
+        tags: ["Auth"],
+        auth: false,
+      }),
+    },
+    async (request, reply) => {
+      const raw = request.cookies[REFRESH_COOKIE_NAME];
+      if (raw) await revokeSession(raw);
+      clearRefreshCookie(reply);
+      return reply.send({ status: "ok" });
+    }
+  );
 
-  fastify.get("/auth/me", { preHandler: authenticate }, async (request, reply) => {
-    const ctx = request.authContext!;
-    const user = await prisma.user.findUniqueOrThrow({ where: { id: ctx.userId } });
-    return reply.send(toPublicUser(user));
-  });
+  fastify.get(
+    "/auth/me",
+    { preHandler: authenticate, schema: routeDocs({ summary: "Usuario autenticado actual", tags: ["Auth"] }) },
+    async (request, reply) => {
+      const ctx = request.authContext!;
+      const user = await prisma.user.findUniqueOrThrow({ where: { id: ctx.userId } });
+      return reply.send(toPublicUser(user));
+    }
+  );
 }

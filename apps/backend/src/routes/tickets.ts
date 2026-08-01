@@ -5,6 +5,7 @@ import { createTicket, resolveTicket, reopenTicket } from "../services/ticket.se
 import { recordAudit } from "../services/audit.service.js";
 import { NotFoundError } from "../lib/errors.js";
 import { authenticate, requireRole } from "../auth/middleware.js";
+import { routeDocs } from "../lib/openapi.js";
 
 const ListQuerySchema = z.object({
   estado: z.enum(["ABIERTO", "EN_PROGRESO", "ESCALADO", "RESUELTO"]).optional(),
@@ -20,12 +21,22 @@ const CreateTicketBodySchema = z.object({
   eventDeploymentId: z.string().optional(),
 });
 
+const TicketIdParamSchema = z.object({ id: z.string() });
+
 export async function ticketRoutes(fastify: FastifyInstance) {
   fastify.addHook("preHandler", authenticate);
 
   fastify.post(
     "/tickets",
-    { preHandler: requireRole("ADMIN", "TECNICO") },
+    {
+      preHandler: requireRole("ADMIN", "TECNICO"),
+      attachValidation: true,
+      schema: routeDocs({
+        summary: "Crear un ticket",
+        tags: ["Tickets"],
+        body: CreateTicketBodySchema,
+      }),
+    },
     async (request, reply) => {
       const body = CreateTicketBodySchema.parse(request.body);
       const ticket = await createTicket(body);
@@ -41,27 +52,47 @@ export async function ticketRoutes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.get("/tickets", async (request, reply) => {
-    const query = ListQuerySchema.parse(request.query);
-    const tickets = await prisma.ticket.findMany({
-      where: query,
-      orderBy: { createdAt: "desc" },
-    });
-    return reply.send(tickets);
-  });
+  fastify.get(
+    "/tickets",
+    {
+      attachValidation: true,
+      schema: routeDocs({ summary: "Listar tickets (filtrable)", tags: ["Tickets"], querystring: ListQuerySchema }),
+    },
+    async (request, reply) => {
+      const query = ListQuerySchema.parse(request.query);
+      const tickets = await prisma.ticket.findMany({
+        where: query,
+        orderBy: { createdAt: "desc" },
+      });
+      return reply.send(tickets);
+    }
+  );
 
-  fastify.get<{ Params: { id: string } }>("/tickets/:id", async (request, reply) => {
-    const ticket = await prisma.ticket.findUnique({
-      where: { id: request.params.id },
-      include: { eventos: { orderBy: { createdAt: "asc" } }, alerts: true },
-    });
-    if (!ticket) throw new NotFoundError(`ticket ${request.params.id}`);
-    return reply.send(ticket);
-  });
+  fastify.get<{ Params: { id: string } }>(
+    "/tickets/:id",
+    {
+      schema: routeDocs({
+        summary: "Detalle de un ticket (incluye eventos y alertas asociadas)",
+        tags: ["Tickets"],
+        params: TicketIdParamSchema,
+      }),
+    },
+    async (request, reply) => {
+      const ticket = await prisma.ticket.findUnique({
+        where: { id: request.params.id },
+        include: { eventos: { orderBy: { createdAt: "asc" } }, alerts: true },
+      });
+      if (!ticket) throw new NotFoundError(`ticket ${request.params.id}`);
+      return reply.send(ticket);
+    }
+  );
 
   fastify.post<{ Params: { id: string } }>(
     "/tickets/:id/resolve",
-    { preHandler: requireRole("ADMIN", "TECNICO") },
+    {
+      preHandler: requireRole("ADMIN", "TECNICO"),
+      schema: routeDocs({ summary: "Marcar un ticket como resuelto", tags: ["Tickets"], params: TicketIdParamSchema }),
+    },
     async (request, reply) => {
       return reply.send(await resolveTicket(request.params.id));
     }
@@ -69,7 +100,10 @@ export async function ticketRoutes(fastify: FastifyInstance) {
 
   fastify.post<{ Params: { id: string } }>(
     "/tickets/:id/reopen",
-    { preHandler: requireRole("ADMIN", "TECNICO") },
+    {
+      preHandler: requireRole("ADMIN", "TECNICO"),
+      schema: routeDocs({ summary: "Reabrir un ticket resuelto", tags: ["Tickets"], params: TicketIdParamSchema }),
+    },
     async (request, reply) => {
       return reply.send(await reopenTicket(request.params.id));
     }

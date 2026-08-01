@@ -5,6 +5,7 @@ import { getToolsForRole } from "../llm/tools/registry.js";
 import { executeTool } from "../llm/tools/executor.js";
 import { getLlmProvider } from "../llm/providers/index.js";
 import { HttpError } from "../lib/errors.js";
+import { routeDocs } from "../lib/openapi.js";
 import type { LlmMessage } from "../llm/provider.js";
 
 const ChatHistoryTurnSchema = z.object({
@@ -57,7 +58,21 @@ function buildSystemPrompt(role: string): string {
 export async function chatRoutes(fastify: FastifyInstance) {
   fastify.addHook("preHandler", authenticate);
 
-  fastify.post("/chat", async (request, reply) => {
+  fastify.post(
+    "/chat",
+    {
+      attachValidation: true,
+      schema: routeDocs({
+        summary: "Enviar un mensaje al orquestador conversacional",
+        description:
+          "Encadena hasta 6 rondas de tool-calling con las tools filtradas según el rol del usuario " +
+          "(`toolResults` trae cada llamada, éxito/error). No hay historial persistido server-side: " +
+          "reenviá los turnos previos en `history` para dar continuidad a la conversación.",
+        tags: ["Chat"],
+        body: ChatBodySchema,
+      }),
+    },
+    async (request, reply) => {
     const ctx = request.authContext!;
     const { message, history } = ChatBodySchema.parse(request.body);
     const tools = getToolsForRole(ctx.role);
@@ -122,6 +137,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
       });
     }
 
-    return reply.send({ mensaje, toolResults });
-  });
+      return reply.send({ mensaje, toolResults });
+    }
+  );
 }
