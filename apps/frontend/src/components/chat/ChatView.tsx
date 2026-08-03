@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Send, Trash2 } from "lucide-react";
 import type { VlanPlan } from "@diktya-atlas/shared";
 import { useAuth } from "../../auth/AuthContext.js";
@@ -19,6 +19,15 @@ export function ChatView() {
   const [input, setInput] = useState("");
   const [csvResult, setCsvResult] = useState<CsvUploadResponse | null>(null);
   const [plan, setPlan] = useState<VlanPlan | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // La ventana de mensajes tiene alto fijo + scroll propio (ver el div de
+  // abajo) para que no siga creciendo la página entera a medida que crece
+  // la conversación — así que hay que scrollear al último mensaje a mano
+  // cada vez que se agrega uno, si no queda fuera de vista.
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages.length]);
 
   function handleCsvResult(result: CsvUploadResponse) {
     setCsvResult(result);
@@ -70,14 +79,19 @@ export function ChatView() {
             </Button>
           </div>
         )}
-        <div className="flex min-h-[300px] flex-col gap-3 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+        <div className="flex h-[60vh] min-h-[320px] max-h-[640px] flex-col gap-3 overflow-y-auto rounded-lg border border-slate-200 p-4 dark:border-slate-800">
           {messages.length === 0 ? (
             <EmptyState
               title="Todavía no hay conversación"
               description="Escribí un mensaje o subí un CSV de redes/VLAN para empezar."
             />
           ) : (
-            messages.map((m) => <ChatMessageCard key={m.id} message={m} />)
+            <>
+              {messages.map((m) => (
+                <ChatMessageCard key={m.id} message={m} />
+              ))}
+              <div ref={bottomRef} />
+            </>
           )}
         </div>
         <form
