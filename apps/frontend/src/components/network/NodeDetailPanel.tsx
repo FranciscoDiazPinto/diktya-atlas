@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { RefreshCw, Power } from "lucide-react";
 import { useNodeDetail } from "../../hooks/useNodeDetail.js";
 import { useDiagnoseNode } from "../../hooks/useDiagnoseNode.js";
@@ -12,21 +13,14 @@ import { NodeStatusBadge } from "./NodeStatusBadge.js";
 import { DeviceTypeIcon } from "./DeviceTypeIcon.js";
 import { Button } from "../ui/Button.js";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../ui/Card.js";
+import { ConfirmDestructiveDialog } from "../ui/ConfirmDestructiveDialog.js";
+import { timeAgo } from "../../lib/timeAgo.js";
 
 function formatUptime(seconds: number | null): string {
   if (!seconds) return "—";
   const hours = Math.floor(seconds / 3600);
   if (hours < 24) return `${hours}h`;
   return `${Math.floor(hours / 24)}d ${hours % 24}h`;
-}
-
-function timeAgo(date: Date | null): string {
-  if (!date) return "sin eventos todavía";
-  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
-  if (seconds < 60) return `hace ${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `hace ${minutes}m`;
-  return `hace ${Math.floor(minutes / 60)}h`;
 }
 
 export function NodeDetailPanel({ nodeId }: { nodeId?: string }) {
@@ -36,6 +30,7 @@ export function NodeDetailPanel({ nodeId }: { nodeId?: string }) {
   const canDiagnose = user?.role === "ADMIN" || user?.role === "TECNICO";
   const diagnose = useDiagnoseNode();
   const reboot = useRebootNode();
+  const [confirmingReboot, setConfirmingReboot] = useState(false);
 
   // Gateway/switch reinician toda la red que pasa por ellos, no solo los
   // clientes WiFi de un AP — la advertencia tiene que reflejar eso, sobre
@@ -48,11 +43,8 @@ export function NodeDetailPanel({ nodeId }: { nodeId?: string }) {
     OTRO: "puede interrumpir la conectividad de los equipos que dependen de este dispositivo",
   };
 
-  function handleReboot(id: string, nombre: string, tipo: string) {
-    const impacto = REBOOT_WARNING[tipo] ?? REBOOT_WARNING.OTRO;
-    if (confirm(`¿Reiniciar "${nombre}"? Esto ${impacto}.`)) {
-      reboot.mutate(id);
-    }
+  function handleRebootConfirmed(id: string) {
+    reboot.mutate(id, { onSuccess: () => setConfirmingReboot(false) });
   }
 
   if (!nodeId) {
@@ -80,7 +72,7 @@ export function NodeDetailPanel({ nodeId }: { nodeId?: string }) {
                 <Button
                   size="sm"
                   variant="destructive"
-                  onClick={() => handleReboot(node.id, node.nombre, node.tipoDispositivo)}
+                  onClick={() => setConfirmingReboot(true)}
                   disabled={reboot.isPending}
                 >
                   <Power className="h-3.5 w-3.5" />
@@ -153,6 +145,15 @@ export function NodeDetailPanel({ nodeId }: { nodeId?: string }) {
           )}
         </div>
       </CardContent>
+      <ConfirmDestructiveDialog
+        open={confirmingReboot}
+        onOpenChange={setConfirmingReboot}
+        title={`¿Reiniciar "${node.nombre}"?`}
+        impactMessage={`Esto ${REBOOT_WARNING[node.tipoDispositivo] ?? REBOOT_WARNING.OTRO}.`}
+        confirmLabel="Reiniciar ahora"
+        pending={reboot.isPending}
+        onConfirm={() => handleRebootConfirmed(node.id)}
+      />
     </Card>
   );
 }

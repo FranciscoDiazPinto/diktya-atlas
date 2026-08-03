@@ -28,6 +28,19 @@ export async function getNetworkStatusSummary(sitio?: string) {
   };
 }
 
+/**
+ * A diferencia de `getNetworkStatusSummary` (Postgres), esto pega en vivo a
+ * UniFi (`listWifiNetworks` → Integration API real, WiFi Broadcasts +
+ * Networks) — la tabla `WifiNetwork` de Postgres no la sincroniza nada
+ * todavía (ni worker-monitor ni nodeSync.service), así que leer de ahí
+ * siempre da vacío. Mismo patrón que unifiOsStatus.service.ts: bajo
+ * demanda, nunca en el polling automático, para no generarle tráfico de
+ * fondo al equipo real.
+ */
+export async function getLiveWifiNetworks(sitio?: string) {
+  return getUnifiClient().listWifiNetworks(sitio);
+}
+
 export async function getApDetail(nodeId: string) {
   const node = await prisma.networkNode.findUnique({
     where: { id: nodeId },

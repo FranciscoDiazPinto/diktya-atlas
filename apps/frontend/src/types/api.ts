@@ -70,6 +70,22 @@ export interface ApiWifiNetwork {
   throughputMbps: number | null;
 }
 
+/**
+ * Respuesta de GET /network/wifi-networks/live — consulta directa a UniFi
+ * (WiFi Broadcasts + Networks), no pasa por Postgres, por eso el shape
+ * difiere de ApiWifiNetwork (sin nodeId, throughputMbps opcional en vez de
+ * nullable). Ver domain/network.ts::WifiNetworkSchema en el backend.
+ */
+export interface LiveWifiNetwork {
+  id: string;
+  sitio: string;
+  ssid: string;
+  vlanId: number;
+  bandas: string[];
+  clientesConectados: number;
+  throughputMbps?: number;
+}
+
 export interface ApiAlert {
   id: string;
   sitio: string;

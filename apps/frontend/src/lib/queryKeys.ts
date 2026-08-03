@@ -11,6 +11,7 @@ export interface TicketFilters {
  */
 export const queryKeys = {
   networkStatus: (sitio?: string) => ["network-status", sitio ?? null] as const,
+  wifiNetworks: (sitio?: string) => ["wifi-networks", sitio ?? null] as const,
   nodeDetail: (id: string) => ["network-node", id] as const,
   opnsenseStatus: () => ["opnsense-status"] as const,
   unifiOsStatus: () => ["unifi-os-status"] as const,

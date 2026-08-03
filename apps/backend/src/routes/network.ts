@@ -1,6 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { getNetworkStatusSummary, getApDetail, diagnoseNode, rebootNode } from "../services/network.service.js";
+import {
+  getNetworkStatusSummary,
+  getLiveWifiNetworks,
+  getApDetail,
+  diagnoseNode,
+  rebootNode,
+} from "../services/network.service.js";
 import { authenticate, requireRole } from "../auth/middleware.js";
 import { routeDocs } from "../lib/openapi.js";
 
@@ -25,6 +31,27 @@ export async function networkRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       const { sitio } = StatusQuerySchema.parse(request.query);
       return reply.send(await getNetworkStatusSummary(sitio));
+    }
+  );
+
+  // Consulta activa a UniFi (no Postgres — esa tabla no la sincroniza nadie
+  // todavía) — mismo criterio de rol que /network/nodes/:id/diagnose:
+  // dispara tráfico real contra el equipo, no es un GET de caché.
+  fastify.get(
+    "/network/wifi-networks/live",
+    {
+      preHandler: requireRole("ADMIN", "TECNICO"),
+      attachValidation: true,
+      schema: routeDocs({
+        summary: "VLANs (SSIDs) reales del sitio, en vivo",
+        description: "Consulta directa a UniFi (WiFi Broadcasts + Networks) — no pasa por Postgres.",
+        tags: ["Red"],
+        querystring: StatusQuerySchema,
+      }),
+    },
+    async (request, reply) => {
+      const { sitio } = StatusQuerySchema.parse(request.query);
+      return reply.send(await getLiveWifiNetworks(sitio));
     }
   );
 
