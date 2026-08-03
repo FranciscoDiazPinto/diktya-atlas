@@ -1,6 +1,6 @@
 ---
 tags: [atlas, infraestructura, redes, rutas]
-updated: 2026-07-29
+updated: 2026-08-03
 ---
 
 # Rutas de red documentadas
@@ -41,6 +41,25 @@ temporal — no asumir que va a seguir estando disponible mañana sin volver a p
 Esto significa que, mientras este port-forward siga activo, **no hace falta levantar WireGuard**
 para llegar al UniFi real desde este equipo — alcanza con `https://10.71.111.101:8443` (ver
 [[Infraestructura Real]] para el estado de acceso actualizado).
+
+### Tercera opción, agregada 2026-08-03 — Site Manager Connector (sin port-forward ni WireGuard)
+
+`integrations/unifiOs/client.ts` ahora soporta un transporte alternativo que no depende de
+ninguna de las dos rutas de arriba: el **Site Manager Connector** de UniFi
+(`https://api.ui.com/v1/connector/consoles/{hostId}/*path`, ver `developer.ui.com/site-manager`)
+reenvía los mismos calls de la Integration API (`/proxy/network/integration/v1/...`) a la consola
+real vía la nube de Ubiquiti — el backend nunca necesita alcance de red directo a
+`10.71.111.101:8443`, ni el port-forward no oficial de arriba, ni la ruta WireGuard diseñada.
+
+Habilitarlo: `UNIFI_INTEGRATION_TRANSPORT=connector` + `UNIFI_SITE_MANAGER_API_KEY` (key con
+scope `site-manager`, generada en unifi.ui.com — key distinta a `UNIFI_API_KEY` de la Integration
+API) + `UNIFI_SITE_MANAGER_HOST_ID` (el `id` de la consola real, se descubre pegándole a
+`GET /site-manager/hosts`, solo Admin). Default sigue siendo `direct` (el port-forward de arriba)
+— no cambia nada hasta que se configure y habilite explícitamente. **Sin probar contra hardware
+real todavía** — no hay key de Site Manager configurada. Rate limit del connector: 100 req/min
+por consola (el polling actual de `worker-monitor`, ~10 calls cada 30s, queda muy por debajo).
+
+Ver [[Proyecto Atlas]] para el detalle completo de la implementación.
 
 ## WireGuard (`WG_USUARIOS`, wg0) — el camino diseñado para llegar a UniFi
 

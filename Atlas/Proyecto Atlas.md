@@ -114,6 +114,13 @@ dedicada.
   al umbral, notifica igual aunque el reset haya funcionado (ADVERTENCIA, "resuelto, sin acción
   necesaria" en vez de problema en curso). Bajo el umbral, el ticket INFO sigue quedando como
   registro completo, solo que sin avisar a nadie.
+- **Site Manager Connector como transporte alternativo de la Integration API, agregado
+  2026-08-03** — `UNIFI_INTEGRATION_TRANSPORT=connector` (default sigue siendo `direct`, sin
+  cambios hasta habilitarlo) pega vía `api.ui.com` en vez de directo a `UNIFI_OS_HOST`, sacando la
+  dependencia del port-forward no oficial en CORE-01. `UnifiOsClient` ahora tiene constructor
+  privado + factories `.direct()`/`.viaConnector()`. Nuevo `GET /site-manager/hosts` (Admin) para
+  descubrir el `UNIFI_SITE_MANAGER_HOST_ID` que hace falta. Sin probar contra hardware real
+  todavía (sin key de Site Manager configurada) — ver [[Rutas de Red]] § Site Manager Connector.
 - **Estado de UniFi Mobility (UMR, routers móviles/de viaje) en `/infra`, agregado 2026-08-03** —
   API cloud separada (`api.ui.com`, no la Integration API de red), solo lectura. Sin
   `UNIFI_MOBILITY_API_KEY` configurada todavía — ver [[OPNsense y UniFi]] § UniFi Mobility.
