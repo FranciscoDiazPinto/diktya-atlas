@@ -1,6 +1,6 @@
 ---
-tags: [atlas, netbot, opnsense, unifi]
-updated: 2026-07-31
+tags: [atlas, netbot, opnsense, unifi, mobility]
+updated: 2026-08-03
 ---
 
 # OPNsense y UniFi (en el software)
@@ -118,6 +118,30 @@ hacer hover.
 mecanismo de speedtest en el código (ver más arriba, "Decisión de alcance explícita"), así que no
 había datos sobre los que construir ese gráfico. Decisión explícita del usuario de no construirlo
 sobre una base inexistente en vez de simularlo.
+
+## UniFi Mobility (2026-08-03)
+
+Card nueva en `/infra`, debajo de "UniFi (real)" — estado de routers móviles/de viaje (UMR:
+`UMR`/`UMR Industrial`/`UMR Ultra`), organizados en "workspaces". **Producto y API totalmente
+distintos** de todo lo de arriba: es la API cloud pública de UniFi Mobility
+(`https://api.ui.com`, auth `X-API-Key` con scope `mobility`, ver `developer.ui.com/mobility`),
+no la Integration API de red ni OPNsense — no comparte host, key, ni modelo de datos con nada de
+lo existente.
+
+`integrations/mobility/client.ts` implementa **solo lectura**: `listWorkspaces`, `listDevices`,
+`getDeviceDetail`, `listDeviceClients`. El spec también define PUT de escritura (renombrar
+device, LAN/DHCP, WiFi) — **deliberadamente no implementados**, esto es para ver estado, no para
+controlar remoto.
+
+`GET /mobility/status` (solo Admin) da un resumen liviano (workspaces + devices, sin el detalle
+completo por device) para no generar un fan-out de N llamadas solo para pintar una lista;
+`GET /mobility/workspaces/:workspaceId/devices/:deviceId` da el detalle completo (señal LTE, VPN,
+ubicación GPS si hay fix, uso de datos celulares) + clientes conectados, bajo demanda — expuesto
+en el backend pero todavía sin consumir desde el frontend (v1 solo muestra la lista con estado).
+
+**Sin `UNIFI_MOBILITY_API_KEY` configurada todavía** — la card muestra correctamente el estado
+"no configurado" (503 del backend), mismo patrón que `UnifiOsRealCard`: sin refetch automático,
+botón "Consultar ahora" porque es tráfico real contra un servicio cloud externo.
 
 ## "Solicitar cambio"
 

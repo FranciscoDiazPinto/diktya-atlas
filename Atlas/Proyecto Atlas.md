@@ -1,6 +1,6 @@
 ---
 tags: [atlas, netbot, documentacion]
-updated: 2026-07-31
+updated: 2026-08-03
 ---
 
 # Diktya Atlas — NetBot
@@ -114,6 +114,9 @@ dedicada.
   al umbral, notifica igual aunque el reset haya funcionado (ADVERTENCIA, "resuelto, sin acción
   necesaria" en vez de problema en curso). Bajo el umbral, el ticket INFO sigue quedando como
   registro completo, solo que sin avisar a nadie.
+- **Estado de UniFi Mobility (UMR, routers móviles/de viaje) en `/infra`, agregado 2026-08-03** —
+  API cloud separada (`api.ui.com`, no la Integration API de red), solo lectura. Sin
+  `UNIFI_MOBILITY_API_KEY` configurada todavía — ver [[OPNsense y UniFi]] § UniFi Mobility.
 - **Doc interactiva de la API (Swagger UI) en `/docs`, agregada 2026-07-31** — `@fastify/swagger` +
   `@fastify/swagger-ui`, reusando los mismos schemas Zod que cada ruta ya usaba para `.parse()` a
   mano (convertidos con `zod-to-json-schema`, ya era dependencia). No cambia la validación en
