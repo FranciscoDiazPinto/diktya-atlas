@@ -26,10 +26,22 @@ export interface UnifiLiveClientConfig {
   password?: string;
   site: string;
   verifyTls: boolean;
-  /** Credenciales de la Integration API (X-API-KEY) — usadas para WLANs, nodos y reboot. */
-  integrationHost: string;
-  integrationApiKey: string;
+  /**
+   * Credenciales de la Integration API (X-API-KEY) — usadas para WLANs,
+   * nodos y reboot. Opcionales acá porque solo hacen falta con
+   * `integrationTransport: "direct"` — con "connector" son
+   * `siteManagerApiKey`/`siteManagerHostId` los que hacen falta. `env.ts`
+   * ya valida (fail-fast al arrancar) que estén los correctos según el
+   * transporte elegido; `getIntegrationClient` vuelve a chequear acá porque
+   * este config también se puede construir a mano (tests).
+   */
+  integrationHost?: string;
+  integrationApiKey?: string;
   integrationVerifyTls: boolean;
+  /** Ver env.ts::UNIFI_INTEGRATION_TRANSPORT — "direct" (default) o "connector" (Site Manager, sin VPN). */
+  integrationTransport: "direct" | "connector";
+  siteManagerApiKey?: string;
+  siteManagerHostId?: string;
 }
 
 /**
@@ -72,14 +84,20 @@ export class UnifiLiveClient implements UnifiClient {
    */
   private async getIntegrationClient(): Promise<UnifiOsClient> {
     if (!this.integrationClientPromise) {
-      this.integrationClientPromise = import("../unifiOs/client.js").then(
-        ({ UnifiOsClient }) =>
-          new UnifiOsClient(
-            `https://${this.config.integrationHost}`,
-            this.config.integrationApiKey,
-            this.config.integrationVerifyTls
-          )
-      );
+      this.integrationClientPromise = import("../unifiOs/client.js").then(({ UnifiOsClient }) => {
+        if (this.config.integrationTransport === "connector") {
+          if (!this.config.siteManagerHostId || !this.config.siteManagerApiKey) {
+            throw new Error(
+              "UNIFI_INTEGRATION_TRANSPORT=connector requiere UNIFI_SITE_MANAGER_HOST_ID y UNIFI_SITE_MANAGER_API_KEY"
+            );
+          }
+          return UnifiOsClient.viaConnector(this.config.siteManagerHostId, this.config.siteManagerApiKey);
+        }
+        if (!this.config.integrationHost || !this.config.integrationApiKey) {
+          throw new Error("UNIFI_INTEGRATION_TRANSPORT=direct requiere UNIFI_OS_HOST y UNIFI_API_KEY");
+        }
+        return UnifiOsClient.direct(this.config.integrationHost, this.config.integrationApiKey, this.config.integrationVerifyTls);
+      });
     }
     return this.integrationClientPromise;
   }
@@ -299,8 +317,18 @@ export class UnifiLiveClient implements UnifiClient {
 }
 
 export function createUnifiLiveClientFromEnv(): UnifiLiveClient {
-  if (!env.UNIFI_OS_HOST || !env.UNIFI_API_KEY) {
-    throw new Error("UNIFI_MODE=live requiere UNIFI_OS_HOST y UNIFI_API_KEY (WLANs/nodos/reboot vía Integration API)");
+  // env.ts ya valida esto mismo (fail-fast) al arrancar según
+  // UNIFI_INTEGRATION_TRANSPORT — se repite acá porque esta función
+  // también es alcanzable sin pasar por ese chequeo (ej. cambiar
+  // UNIFI_MODE a "live" en caliente no re-corre loadEnv()).
+  const missing =
+    env.UNIFI_INTEGRATION_TRANSPORT === "connector"
+      ? (["UNIFI_SITE_MANAGER_HOST_ID", "UNIFI_SITE_MANAGER_API_KEY"] as const).filter((k) => !env[k])
+      : (["UNIFI_OS_HOST", "UNIFI_API_KEY"] as const).filter((k) => !env[k]);
+  if (missing.length > 0) {
+    throw new Error(
+      `UNIFI_MODE=live con UNIFI_INTEGRATION_TRANSPORT=${env.UNIFI_INTEGRATION_TRANSPORT} requiere: ${missing.join(", ")}`
+    );
   }
   // UNIFI_HOST/USERNAME/PASSWORD (API clásica) son opcionales — ver
   // UnifiLiveClientConfig, solo los usa listAlerts, que nada llama hoy.
@@ -314,5 +342,8 @@ export function createUnifiLiveClientFromEnv(): UnifiLiveClient {
     integrationHost: env.UNIFI_OS_HOST,
     integrationApiKey: env.UNIFI_API_KEY,
     integrationVerifyTls: env.UNIFI_OS_VERIFY_TLS,
+    integrationTransport: env.UNIFI_INTEGRATION_TRANSPORT,
+    siteManagerApiKey: env.UNIFI_SITE_MANAGER_API_KEY,
+    siteManagerHostId: env.UNIFI_SITE_MANAGER_HOST_ID,
   });
 }

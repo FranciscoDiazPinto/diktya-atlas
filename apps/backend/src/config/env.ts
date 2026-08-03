@@ -30,6 +30,24 @@ const EnvSchema = z.object({
   // false a propósito para no romper por TLS al primer intento.
   UNIFI_OS_VERIFY_TLS: z.coerce.boolean().default(false),
 
+  // Transporte de la Integration API (ver integrations/unifiOs/): "direct"
+  // pega directo contra UNIFI_OS_HOST (requiere alcance de red — hoy un
+  // port-forward no oficial en CORE-01, ver Atlas/Rutas de Red.md, caído
+  // mientras el Starlink no tenga IP). "connector" pega vía el Site Manager
+  // Connector (api.ui.com), sin necesitar alcance de red directo — requiere
+  // UNIFI_SITE_MANAGER_API_KEY + UNIFI_SITE_MANAGER_HOST_ID. Default
+  // "direct" a propósito: no cambiar el comportamiento actual hasta que el
+  // usuario configure y habilite el connector explícitamente.
+  UNIFI_INTEGRATION_TRANSPORT: z.enum(["direct", "connector"]).default("direct"),
+  // API cloud de UniFi Site Manager (developer.ui.com/site-manager) — otro
+  // scope de key, separado de UNIFI_API_KEY (Integration API) y de
+  // UNIFI_MOBILITY_API_KEY. HOST_ID: el "id" que devuelve GET /v1/hosts para
+  // la consola real (ver GET /site-manager/hosts, ADMIN, para descubrirlo) —
+  // no se resuelve solo en runtime a propósito, mismo criterio manual que
+  // UNIFI_OS_HOST (se busca una vez, se pega en .env).
+  UNIFI_SITE_MANAGER_API_KEY: z.string().optional(),
+  UNIFI_SITE_MANAGER_HOST_ID: z.string().optional(),
+
   // API de UniFi Mobility (routers móviles/de viaje UMR, ver
   // integrations/mobility/) — servicio cloud de Ubiquiti (api.ui.com), no
   // self-hosted como OPNsense/UniFi OS, por eso no hay HOST/VERIFY_TLS acá.
@@ -105,13 +123,16 @@ function loadEnv() {
     // vía la Integration API. UNIFI_HOST/USERNAME/PASSWORD (API clásica) NO
     // son requeridos acá a propósito — solo los usa listAlerts, que nada
     // llama hoy, y no hay cuenta clásica creada en el UDM real (decisión
-    // explícita, ver Atlas/Infraestructura Real.md).
-    const missing = ["UNIFI_OS_HOST", "UNIFI_API_KEY"].filter(
-      (key) => !parsed.data[key as keyof typeof parsed.data]
-    );
+    // explícita, ver Atlas/Infraestructura Real.md). Los campos requeridos
+    // dependen del transporte elegido (ver UNIFI_INTEGRATION_TRANSPORT).
+    const requiredKeys =
+      parsed.data.UNIFI_INTEGRATION_TRANSPORT === "connector"
+        ? (["UNIFI_SITE_MANAGER_API_KEY", "UNIFI_SITE_MANAGER_HOST_ID"] as const)
+        : (["UNIFI_OS_HOST", "UNIFI_API_KEY"] as const);
+    const missing = requiredKeys.filter((key) => !parsed.data[key]);
     if (missing.length > 0) {
       throw new Error(
-        `UNIFI_MODE=live requiere: ${missing.join(", ")}`
+        `UNIFI_MODE=live con UNIFI_INTEGRATION_TRANSPORT=${parsed.data.UNIFI_INTEGRATION_TRANSPORT} requiere: ${missing.join(", ")}`
       );
     }
   }

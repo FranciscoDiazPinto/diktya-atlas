@@ -95,6 +95,17 @@ interface PagedResponse<T> {
 }
 
 /**
+ * El Site Manager Connector (`https://api.ui.com/v1/connector/consoles/{id}/*path`)
+ * reenvía `*path` a `http://127.0.0.1/proxy/{*path}` DENTRO de la consola —
+ * como nuestros paths ya incluyen el `/proxy` (pensados para pegarle directo
+ * al host, ver modo `direct`), hay que sacárselo antes de armar la URL del
+ * connector o el proxy queda duplicado (`/proxy/proxy/...`, 404).
+ */
+export function stripProxyPrefix(path: string): string {
+  return path.replace(/^\/proxy/, "");
+}
+
+/**
  * Cliente contra la API pública de integraciones de UniFi OS
  * (`/proxy/network/integration/v1/...`, auth por header X-API-KEY).
  *
@@ -109,23 +120,48 @@ interface PagedResponse<T> {
  * WLANs sí están acá (como "WiFi Broadcasts", ver integrations/unifi/liveClient.ts
  * ::writeWifiNetwork) — el nombre cambió respecto a la API clásica, no falta
  * el endpoint.
+ *
+ * Dos transportes posibles (constructor privado — usar los factories):
+ * - `direct`: pega directo contra la consola (requiere alcance de red — hoy
+ *   un port-forward no oficial en CORE-01, ver Atlas/Rutas de Red.md, caído
+ *   mientras el Starlink no tenga IP). TLS relajado (cert self-signed).
+ * - `viaConnector`: pega vía el Site Manager Connector (`api.ui.com`), sin
+ *   necesitar alcance de red directo — mismos paths (Integration API), cert
+ *   público válido (sin `Agent` custom), le saca el `/proxy` a cada path
+ *   antes de pedirlo (ver `stripProxyPrefix`).
  */
 export class UnifiOsClient {
-  private agent: Agent;
-
-  constructor(
+  private constructor(
     private baseUrl: string,
     private apiKey: string,
-    verifyTls: boolean
-  ) {
-    this.agent = new Agent({ connect: { rejectUnauthorized: verifyTls } });
+    private headerName: "X-API-KEY" | "X-API-Key",
+    private agent: Agent | undefined,
+    private stripProxy: boolean
+  ) {}
+
+  static direct(host: string, apiKey: string, verifyTls: boolean): UnifiOsClient {
+    return new UnifiOsClient(
+      `https://${host}`,
+      apiKey,
+      "X-API-KEY",
+      new Agent({ connect: { rejectUnauthorized: verifyTls } }),
+      false
+    );
+  }
+
+  static viaConnector(hostId: string, apiKey: string): UnifiOsClient {
+    return new UnifiOsClient(`https://api.ui.com/v1/connector/consoles/${hostId}`, apiKey, "X-API-Key", undefined, true);
+  }
+
+  private resolvePath(path: string): string {
+    return this.stripProxy ? stripProxyPrefix(path) : path;
   }
 
   private async requestJson<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
-    const res = await undiciFetch(`${this.baseUrl}${path}`, {
+    const res = await undiciFetch(`${this.baseUrl}${this.resolvePath(path)}`, {
       method: init?.method ?? "GET",
       headers: {
-        "X-API-KEY": this.apiKey,
+        [this.headerName]: this.apiKey,
         ...(init?.body ? { "content-type": "application/json" } : {}),
       },
       body: init?.body ? JSON.stringify(init.body) : undefined,
@@ -144,10 +180,10 @@ export class UnifiOsClient {
 
   /** Para endpoints de acción que no devuelven cuerpo (ej. reboot). */
   private async requestVoid(path: string, init?: { method?: string; body?: unknown }): Promise<void> {
-    const res = await undiciFetch(`${this.baseUrl}${path}`, {
+    const res = await undiciFetch(`${this.baseUrl}${this.resolvePath(path)}`, {
       method: init?.method ?? "GET",
       headers: {
-        "X-API-KEY": this.apiKey,
+        [this.headerName]: this.apiKey,
         ...(init?.body ? { "content-type": "application/json" } : {}),
       },
       body: init?.body ? JSON.stringify(init.body) : undefined,
@@ -274,13 +310,24 @@ export class UnifiOsClient {
 
 let instance: UnifiOsClient | null | undefined;
 
-/** `undefined` = todavía no se intentó instanciar; `null` = no configurado (falta host/key). */
+/**
+ * `undefined` = todavía no se intentó instanciar; `null` = no configurado
+ * (según UNIFI_INTEGRATION_TRANSPORT, falta host/key o falta la config del
+ * connector — ver env.ts).
+ */
 export function getUnifiOsClient(): UnifiOsClient | null {
   if (instance === undefined) {
-    instance =
-      env.UNIFI_OS_HOST && env.UNIFI_API_KEY
-        ? new UnifiOsClient(`https://${env.UNIFI_OS_HOST}`, env.UNIFI_API_KEY, env.UNIFI_OS_VERIFY_TLS)
-        : null;
+    if (env.UNIFI_INTEGRATION_TRANSPORT === "connector") {
+      instance =
+        env.UNIFI_SITE_MANAGER_HOST_ID && env.UNIFI_SITE_MANAGER_API_KEY
+          ? UnifiOsClient.viaConnector(env.UNIFI_SITE_MANAGER_HOST_ID, env.UNIFI_SITE_MANAGER_API_KEY)
+          : null;
+    } else {
+      instance =
+        env.UNIFI_OS_HOST && env.UNIFI_API_KEY
+          ? UnifiOsClient.direct(env.UNIFI_OS_HOST, env.UNIFI_API_KEY, env.UNIFI_OS_VERIFY_TLS)
+          : null;
+    }
   }
   return instance;
 }

@@ -19,20 +19,28 @@ const executeDeviceAction = vi.fn();
 const listPendingDevices = vi.fn();
 const adoptDevice = vi.fn();
 
+const fakeIntegrationClient = {
+  listWifiBroadcasts,
+  listNetworks,
+  getWifiBroadcastDetail,
+  updateWifiBroadcast,
+  resolveSiteId,
+  listDevices,
+  listClients,
+  getDeviceLatestStatistics,
+  executeDeviceAction,
+  listPendingDevices,
+  adoptDevice,
+};
+
+// `UnifiOsClient` tiene constructor privado (ver client.ts) — se construye
+// vía los factories estáticos `.direct()`/`.viaConnector()`, así que el
+// mock reemplaza esos dos en vez de la clase como constructor.
 vi.mock("../src/integrations/unifiOs/client.js", () => ({
-  UnifiOsClient: vi.fn().mockImplementation(() => ({
-    listWifiBroadcasts,
-    listNetworks,
-    getWifiBroadcastDetail,
-    updateWifiBroadcast,
-    resolveSiteId,
-    listDevices,
-    listClients,
-    getDeviceLatestStatistics,
-    executeDeviceAction,
-    listPendingDevices,
-    adoptDevice,
-  })),
+  UnifiOsClient: {
+    direct: vi.fn().mockReturnValue(fakeIntegrationClient),
+    viaConnector: vi.fn().mockReturnValue(fakeIntegrationClient),
+  },
 }));
 
 const { UnifiLiveClient } = await import("../src/integrations/unifi/liveClient.js");
@@ -48,6 +56,7 @@ function makeClient() {
     integrationHost: "udm.local",
     integrationApiKey: "test-key",
     integrationVerifyTls: false,
+    integrationTransport: "direct",
   });
 }
 
