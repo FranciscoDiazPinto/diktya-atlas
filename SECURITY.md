@@ -46,28 +46,35 @@ deben coincidir (defensa en profundidad):
 El sistema corre en la red local del cliente/evento pero necesita que la
 dirección real del servidor no quede expuesta. Dos opciones evaluadas:
 
-### Recomendado por default: VPN de malla (Tailscale)
+### Recomendado por default: VPN de malla (ZeroTier)
 
 Para uso exclusivo del equipo técnico (que es el caso hoy: Admin/Técnico
 necesitan acceso, Visualizador todavía no tiene un caso de uso externo real).
 
-- Cada máquina del equipo corre `tailscale up` y se une a la misma red
-  (tailnet) de Diktya. El backend nunca expone un puerto al router/internet.
-- El backend + Postgres + Redis quedan en la máquina/VM que corre
-  `docker compose` (ver `docker-compose.yml`), accesible solo por la IP/DNS
-  de Tailscale (`MagicDNS`, ej. `netbot.tailnet-xyz.ts.net`).
-- ACLs de Tailscale (`tailscale.com/admin/acls`) restringen quién puede
-  llegar al puerto del backend, no solo "estar en la VPN".
-- TLS: Tailscale puede emitir certificados HTTPS automáticos por nodo
-  (`tailscale cert`) — usarlos con un reverse proxy liviano (Caddy) delante
-  del backend en vez de exponer Fastify directo.
-- Pasos: `tailscale up` → `tailscale cert netbot.<tailnet>.ts.net` → Caddy
-  con ese cert, `reverse_proxy localhost:3000` → backend/workers como
-  servicios systemd (`ExecStart=node dist/server.js`, `Restart=on-failure`).
+**Actualizado 2026-08-03**: se decidió ZeroTier en vez de Tailscale (la
+recomendación original de este documento) — ZeroTier ya está desplegado y
+en uso real hoy mismo, es el mismo camino que usa este equipo para llegar a
+OPNsense/UniFi (ver `Atlas/Rutas de Red.md`), así que se suma NetBot a esa
+misma red en vez de introducir una herramienta nueva sin necesidad.
 
-**Ventaja**: cero superficie pública, no depende de que Cloudflare/el ISP
-estén disponibles, y el control de acceso es a nivel de red, no solo de
-aplicación.
+- Cada máquina del equipo (y la máquina que corre NetBot) se une a la red
+  ZeroTier `diktya-atlas-mgmt` (id `76fc96e498382f09`) — autorizado por
+  quien administra esa red en ZeroTier Central. El backend nunca expone un
+  puerto al router/internet.
+- El backend + Postgres + Redis + workers quedan en la máquina dedicada que
+  corre `docker compose -f docker-compose.prod.yml` (ver `DEPLOY.md`),
+  alcanzable solo por su IP de ZeroTier dentro de esa red privada — ningún
+  servicio interno publica puerto al host salvo Caddy (80/443).
+- TLS: como ZeroTier no emite certificados propios (a diferencia de
+  Tailscale), se usa Caddy con desafío **DNS-01 vía Cloudflare** (dominio
+  `diktya.cl`) — no requiere que la máquina sea alcanzable públicamente,
+  solo control del DNS, y evita el warning de certificado autofirmado.
+- Pasos y artefactos concretos: ver `DEPLOY.md` (runbook completo) y
+  `docker-compose.prod.yml` / `deploy/Caddyfile`.
+
+**Ventaja**: cero superficie pública, reusa infraestructura ya operativa
+(no depende de adoptar ni aprender una herramienta nueva), y el control de
+acceso es a nivel de red, no solo de aplicación.
 
 ### Solo si aparece un caso de uso externo real: Cloudflare Tunnel
 
@@ -93,16 +100,21 @@ específicas, no reabrir todo el backend.
 
 ## Checklist de auditoría y secretos antes de producción
 
+**Ver `.env.production.example` y `DEPLOY.md`** — cubren en concreto cada
+punto de esta lista (plantilla + runbook), esto queda como el resumen.
+
 - [ ] `JWT_SECRET` generado con `openssl rand -hex 32` (o más), distinto en
-      cada ambiente, nunca commiteado (`.env` está en `.gitignore`).
+      cada ambiente, nunca commiteado (`.env`/`.env.production` están en
+      `.gitignore`).
 - [ ] `ALLOW_DEV_ROLE_HEADER` en `false` — se fuerza solo automáticamente
       cuando `NODE_ENV=production` (ver `config/env.ts`); confirmar que el
       deploy real setea esa variable.
 - [ ] `DATABASE_URL`/`REDIS_URL` con credenciales rotables, no las de
       desarrollo local del `docker-compose.yml`.
-- [ ] Passwords de los 3 usuarios sembrados por `prisma/seed.ts`
-      (`NetBotDev123!`) cambiadas o esos usuarios eliminados antes de
-      producción — son de desarrollo, quedan documentadas ahí a propósito.
+- [ ] Los 3 usuarios `*.dev.local` sembrados por `prisma/seed.ts`
+      (password `NetBotDev123!`) **no se llevan a producción** — usar
+      `pnpm --filter backend user:create` (`apps/backend/prisma/createUser.ts`)
+      para las cuentas reales del equipo en su lugar.
 - [ ] Cookie de refresh con `secure=true` (se activa solo si
       `NODE_ENV=production`, confirmar que el proxy/túnel termina TLS antes
       del backend para que la cookie efectivamente viaje sobre HTTPS).

@@ -1,0 +1,9 @@
+# Caddy interno del contenedor frontend — sirve el build estático de Vite,
+# sin TLS (el Caddy de borde, deploy/Caddyfile, es el que la termina y
+# habla con este contenedor por la red interna de Docker).
+:80 {
+	root * /srv
+	encode gzip
+	file_server
+	try_files {path} /index.html
+}

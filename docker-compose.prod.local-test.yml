@@ -1,0 +1,21 @@
+# Override SOLO para probar el stack de docker-compose.prod.yml en esta
+# laptop sin Caddy/TLS — publica los puertos de backend/frontend directo al
+# host. No se usa en el deploy real (ver DEPLOY.md), es una conveniencia de
+# desarrollo. Uso:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.prod.local-test.yml \
+#     up -d --build backend worker-monitor worker-triage worker-remediation \
+#     worker-ticket-followup worker-autoremediate frontend
+# (sin "caddy" en la lista — no hace falta para esta prueba)
+services:
+  backend:
+    ports:
+      - "3999:3000"
+  frontend:
+    build:
+      # Sin Caddy de borde reenviando /api/* al backend, el frontend tiene
+      # que hablarle directo al puerto publicado del backend (ver arriba) —
+      # distinto del /api relativo que se usa en el deploy real.
+      args:
+        VITE_API_BASE_URL: http://localhost:3999
+    ports:
+      - "8080:80"

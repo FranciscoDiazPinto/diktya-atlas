@@ -1,0 +1,26 @@
+# Caddy de borde — único punto que expone 80/443. Termina TLS (DNS-01 vía
+# Cloudflare, no requiere que esta máquina sea alcanzable públicamente) y
+# reenvía a los contenedores internos: /api/* -> backend, resto -> frontend
+# (que a su vez sirve el SPA con su propio Caddy interno, ver
+# apps/frontend/deploy.Caddyfile).
+{$NETBOT_DOMAIN} {
+	tls {
+		dns cloudflare {$CF_API_TOKEN}
+	}
+
+	# Sin el prefijo /api al reenviar — el backend no conoce ese prefijo,
+	# sus rutas son /network/*, /auth/*, /tickets/*, etc. tal cual. Esto
+	# también cubre el WebSocket (useRealtimeSocket.ts arma la URL como
+	# `${VITE_API_BASE_URL}/ws` = /api/ws → llega acá, no al catch-all de
+	# abajo) — reverse_proxy de Caddy maneja el upgrade solo, sin config
+	# extra.
+	handle_path /api/* {
+		reverse_proxy backend:3000
+	}
+
+	handle {
+		reverse_proxy frontend:80
+	}
+
+	encode gzip
+}

@@ -12,13 +12,20 @@
     "lint": "tsc -p tsconfig.json --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:seed": "tsx prisma/seed.ts",
+    "user:create": "tsx prisma/createUser.ts",
     "db:test:setup": "tsx --env-file=.env prisma/setupTestDb.ts",
     "worker:monitor": "tsx watch --env-file=.env src/workers/worker-monitor.ts",
     "worker:triage": "tsx watch --env-file=.env src/workers/worker-triage.ts",
     "worker:remediation": "tsx watch --env-file=.env src/workers/worker-remediation.ts",
     "worker:ticket-followup": "tsx watch --env-file=.env src/workers/worker-ticket-followup.ts",
-    "worker:autoremediate": "tsx watch --env-file=.env src/workers/worker-autoremediate.ts"
+    "worker:autoremediate": "tsx watch --env-file=.env src/workers/worker-autoremediate.ts",
+    "start:worker:monitor": "node dist/workers/worker-monitor.js",
+    "start:worker:triage": "node dist/workers/worker-triage.js",
+    "start:worker:remediation": "node dist/workers/worker-remediation.js",
+    "start:worker:ticket-followup": "node dist/workers/worker-ticket-followup.js",
+    "start:worker:autoremediate": "node dist/workers/worker-autoremediate.js"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

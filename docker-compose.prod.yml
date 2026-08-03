@@ -1,0 +1,100 @@
+# Deploy de producción — ver DEPLOY.md para el runbook completo.
+# Uso: docker compose -f docker-compose.prod.yml up -d --build
+# (o `docker-compose` si el host no tiene el plugin `docker compose` v2)
+#
+# Deliberadamente sin ninguna interpolación ${VAR} a nivel de Compose —
+# cada servicio lee sus valores solo vía `env_file: .env.production`, así
+# el comportamiento no depende de acordarse de pasar `--env-file` en cada
+# invocación (build/up/run/logs/...). Si `.env.production` no existe, todos
+# los servicios fallan alto y claro (env inválido), nunca en silencio con
+# credenciales vacías.
+#
+# A diferencia de docker-compose.yml (dev, Postgres/Redis con puerto
+# publicado al host para conectarse desde `pnpm dev` en la laptop), acá
+# NINGÚN servicio interno publica puerto — solo `caddy` expone 80/443.
+# Postgres/Redis/backend/workers/frontend solo son alcanzables entre sí por
+# la red interna de Docker.
+
+x-backend-image: &backend-image
+  build:
+    context: .
+    dockerfile: apps/backend/Dockerfile
+  env_file: .env.production
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_started
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: .env.production
+    volumes:
+      - netbot_postgres_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - netbot_redis_prod_data:/data
+
+  backend:
+    <<: *backend-image
+    command: ["node", "dist/server.js"]
+
+  worker-monitor:
+    <<: *backend-image
+    command: ["node", "dist/workers/worker-monitor.js"]
+
+  worker-triage:
+    <<: *backend-image
+    command: ["node", "dist/workers/worker-triage.js"]
+
+  worker-remediation:
+    <<: *backend-image
+    command: ["node", "dist/workers/worker-remediation.js"]
+
+  worker-ticket-followup:
+    <<: *backend-image
+    command: ["node", "dist/workers/worker-ticket-followup.js"]
+
+  worker-autoremediate:
+    <<: *backend-image
+    command: ["node", "dist/workers/worker-autoremediate.js"]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    build:
+      context: deploy
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    env_file: .env.production
+    volumes:
+      - netbot_caddy_data:/data
+      - netbot_caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  netbot_postgres_prod_data:
+  netbot_redis_prod_data:
+  netbot_caddy_data:
+  netbot_caddy_config:
