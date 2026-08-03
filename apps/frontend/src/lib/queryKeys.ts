@@ -18,4 +18,6 @@ export const queryKeys = {
   ticketDetail: (id: string) => ["ticket", id] as const,
   activityDigest: (desde: string, hasta: string) => ["activity-digest", desde, hasta] as const,
   availability: (desde: string, hasta: string) => ["availability", desde, hasta] as const,
+  mobilityStatus: () => ["mobility-status"] as const,
+  mobilityDeviceDetail: (workspaceId: string, deviceId: string) => ["mobility-device", workspaceId, deviceId] as const,
 };

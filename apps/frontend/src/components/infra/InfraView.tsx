@@ -15,6 +15,7 @@ import { Button } from "../ui/Button.js";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../ui/Select.js";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../ui/Card.js";
 import { AvailabilityDashboard } from "./AvailabilityDashboard.js";
+import { MobilityCard } from "./MobilityCard.js";
 import type { ApiAlertSeverity } from "../../types/api.js";
 
 function nodeTone(status: string): StatusTone {
@@ -264,6 +265,7 @@ export function InfraView() {
           <OpnsenseCard />
           <UnifiSummaryCard />
           <UnifiOsRealCard />
+          <MobilityCard />
         </div>
         <RequestChangeForm />
       </div>

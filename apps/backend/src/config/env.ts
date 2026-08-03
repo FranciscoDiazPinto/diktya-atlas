@@ -30,6 +30,13 @@ const EnvSchema = z.object({
   // false a propósito para no romper por TLS al primer intento.
   UNIFI_OS_VERIFY_TLS: z.coerce.boolean().default(false),
 
+  // API de UniFi Mobility (routers móviles/de viaje UMR, ver
+  // integrations/mobility/) — servicio cloud de Ubiquiti (api.ui.com), no
+  // self-hosted como OPNsense/UniFi OS, por eso no hay HOST/VERIFY_TLS acá.
+  // Solo lectura: no se implementaron los PUT de escritura (nombre/LAN-DHCP/
+  // WiFi) del spec, decisión explícita de alcance (surface status, no control).
+  UNIFI_MOBILITY_API_KEY: z.string().optional(),
+
   // Auto-remediación (ver services/autoRemediation.service.ts): qué tipos
   // de dispositivo puede auto-reiniciar/re-adoptar sin confirmación humana.
   // Política controlada por Admin (config, no rol de usuario — la acción la

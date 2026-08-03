@@ -223,6 +223,71 @@ export interface UnifiOsStatus {
   clients: UnifiOsConnectedClient[];
 }
 
+/**
+ * UniFi Mobility (routers móviles/de viaje UMR) — API cloud separada de
+ * OPNsense/UniFi OS, ver integrations/mobility. Solo lectura.
+ */
+export type ApiMobilityDeviceState =
+  | "CONNECTED"
+  | "DISCONNECTED"
+  | "ADOPTING"
+  | "ADOPTING_TIMEOUT"
+  | "DOWNLOADING"
+  | "UPGRADING"
+  | "RESTARTING"
+  | "FACTORY_RESET"
+  | "GETTING_READY"
+  | "RESTORING"
+  | "NULL"
+  | "DELETING";
+
+export interface ApiMobilityWorkspace {
+  workspace_id: string;
+  workspace_name: string;
+  is_owner: boolean;
+  status: "ACTIVE" | "PENDING" | "INACTIVE" | "DECLINED";
+}
+
+export interface ApiMobilityDevice {
+  id: string;
+  name: string;
+  model: "UMR" | "UMR Industrial" | "UMR Ultra";
+  state: ApiMobilityDeviceState;
+  firmware_version: string;
+  mac_address: string;
+}
+
+export interface ApiMobilityStatus {
+  workspaces: Array<{ workspace: ApiMobilityWorkspace; devices: ApiMobilityDevice[] }>;
+}
+
+export interface ApiMobilityDeviceDetail extends ApiMobilityDevice {
+  wan_source: "LTE" | "WAN" | "WIFIWAN" | "";
+  wan_ip: string;
+  isp: string;
+  lte_signal_level: "NO_SIGNAL" | "POOR" | "FAIR" | "STRONG" | "";
+  memory_usage_percent: number;
+  uptime_seconds: number;
+  client_count: number;
+  vpn_status: "CONNECTING" | "CONNECTED" | "DISCONNECTED" | "FAILED" | "";
+  location?: { latitude: number; longitude: number; last_updated: number };
+}
+
+export interface ApiMobilityDeviceClient {
+  mac: string;
+  name: string;
+  type: "WIRED" | "WIRELESS";
+  connection_status: "ONLINE" | "OFFLINE" | "BLOCKED";
+  ip_address: string;
+  is_blocked: boolean;
+  wifi_experience?: number;
+}
+
+export interface ApiMobilityDeviceDetailResponse {
+  detail: ApiMobilityDeviceDetail;
+  clients: ApiMobilityDeviceClient[];
+}
+
 export interface ApNodeDetail extends ApiNetworkNode {
   wifiNetworks: ApiWifiNetwork[];
   alerts: ApiAlert[];
