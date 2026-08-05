@@ -55,6 +55,8 @@ export interface ApiNetworkNode {
   clientesConectados: number;
   uptimeSegundos: number | null;
   ultimaVezVisto: string | null;
+  /** SSIDs que este nodo transmite ahora mismo — solo AP suele tener alguno. */
+  ssidsTransmitidos: string[];
   createdAt: string;
   updatedAt: string;
 }

@@ -84,6 +84,11 @@ model NetworkNode {
   // autoRemediation.service.ts). No la trae la API clásica de alarmas,
   // solo la Integration API.
   macAddress         String?
+  // SSIDs que este nodo transmite ahora mismo (solo tiene sentido para
+  // tipoDispositivo=AP) — viene de normalizeIntegrationDevice, se calculaba
+  // pero se descartaba antes de llegar acá (no había columna, ver
+  // nodeSync.service.ts::syncNode).
+  ssidsTransmitidos String[] @default([])
   // Cooldown de auto-remediación (ver autoRemediation.service.ts): se
   // actualiza al INTENTAR, sin importar el resultado, para no reintentar
   // en loop sobre un dispositivo que está flapping.

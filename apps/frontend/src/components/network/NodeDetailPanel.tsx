@@ -108,19 +108,13 @@ export function NodeDetailPanel({ nodeId }: { nodeId?: string }) {
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
             Redes WiFi (SSID)
           </p>
-          {node.wifiNetworks.length === 0 ? (
+          {node.ssidsTransmitidos.length === 0 ? (
             <p className="text-xs text-slate-400">Sin SSIDs transmitidos.</p>
           ) : (
             <ul className="flex flex-col gap-1 text-sm">
-              {node.wifiNetworks.map((w) => (
-                <li
-                  key={w.id}
-                  className="flex justify-between rounded border border-slate-100 px-2 py-1 dark:border-slate-800"
-                >
-                  <span>{w.ssid}</span>
-                  <span className="text-slate-500 dark:text-slate-400">
-                    VLAN {w.vlanId} · {w.bandas.join("/")} · {w.clientesConectados} clientes
-                  </span>
+              {node.ssidsTransmitidos.map((ssid) => (
+                <li key={ssid} className="rounded border border-slate-100 px-2 py-1 dark:border-slate-800">
+                  {ssid}
                 </li>
               ))}
             </ul>

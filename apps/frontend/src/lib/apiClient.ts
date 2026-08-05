@@ -51,7 +51,7 @@ export function createApiClient(opts: ApiClientOptions) {
     post: <T>(path: string, body?: unknown): Promise<T> =>
       fetch(`${API_BASE_URL}${path}`, {
         method: "POST",
-        headers: buildHeaders(opts, { "content-type": "application/json" }),
+        headers: buildHeaders(opts, body !== undefined ? { "content-type": "application/json" } : undefined),
         credentials: "include",
         body: body !== undefined ? JSON.stringify(body) : undefined,
       }).then((r) => handleResponse<T>(r)),
@@ -67,7 +67,7 @@ export function createApiClient(opts: ApiClientOptions) {
     patch: <T>(path: string, body?: unknown): Promise<T> =>
       fetch(`${API_BASE_URL}${path}`, {
         method: "PATCH",
-        headers: buildHeaders(opts, { "content-type": "application/json" }),
+        headers: buildHeaders(opts, body !== undefined ? { "content-type": "application/json" } : undefined),
         credentials: "include",
         body: body !== undefined ? JSON.stringify(body) : undefined,
       }).then((r) => handleResponse<T>(r)),

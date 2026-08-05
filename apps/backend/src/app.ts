@@ -103,6 +103,13 @@ export function buildApp(): FastifyInstance {
     if ((err as { code?: string }).code === "FST_REQ_FILE_TOO_LARGE") {
       return reply.code(413).send({ error: "El archivo supera el tamaño máximo permitido (50MB)" });
     }
+    // El cliente HTTP no debería mandar `Content-Type: application/json` sin
+    // body (ver apiClient.ts::post/patch), pero si algún caller nuevo lo hace
+    // por error, que dé 400 en vez de un 500 genérico — Fastify lo detecta
+    // acá porque el parser de JSON lo rechaza antes de llegar a la ruta.
+    if ((err as { code?: string }).code === "FST_ERR_CTP_EMPTY_JSON_BODY") {
+      return reply.code(400).send({ error: "El request no puede llevar Content-Type: application/json sin body" });
+    }
     // @fastify/rate-limit tira un Error plano con `.statusCode = 429` (no una
     // clase distinguible por `instanceof`) — sin este caso caía al 500
     // genérico de abajo, indistinguible para el cliente de un error real

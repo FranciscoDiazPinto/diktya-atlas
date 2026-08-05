@@ -42,6 +42,7 @@ export async function syncNode(node: NetworkNode) {
       clientesConectados: node.clientesConectados,
       uptimeSegundos: node.uptimeSegundos,
       ultimaVezVisto: new Date(node.ultimaVezVisto),
+      ssidsTransmitidos: node.ssidsTransmitidos,
     },
     update: {
       sitio: node.sitio,
@@ -54,6 +55,7 @@ export async function syncNode(node: NetworkNode) {
       clientesConectados: node.clientesConectados,
       uptimeSegundos: node.uptimeSegundos,
       ultimaVezVisto: new Date(node.ultimaVezVisto),
+      ssidsTransmitidos: node.ssidsTransmitidos,
     },
   });
 

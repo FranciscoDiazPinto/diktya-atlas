@@ -113,6 +113,7 @@ function nodo(overrides: Partial<ApiNetworkNode>): ApiNetworkNode {
     clientesConectados: 12,
     uptimeSegundos: 3600,
     ultimaVezVisto: new Date().toISOString(),
+    ssidsTransmitidos: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     ...overrides,
