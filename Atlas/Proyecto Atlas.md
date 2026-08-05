@@ -85,8 +85,12 @@ dedicada.
 
 ## Estado actual / pendientes conocidos
 
-- Cliente OPNsense real: no implementado (mock funcional, ver [[OPNsense y UniFi]]).
-- Gestión de usuarios/roles desde el panel Admin: no implementada.
+- Cliente OPNsense real: no implementado (mock funcional, ver [[OPNsense y UniFi]]) — **próximo
+  paso acordado con el usuario** (2026-08-03): conectarlo real con restricción de roles
+  admin/técnico.
+- Gestión de usuarios/roles desde el panel Admin: sigue sin UI, pero desde 2026-08-03 hay un
+  script CLI (`apps/backend/prisma/createUser.ts`, `pnpm user:create`) que cubre la necesidad
+  inmediata de crear cuentas reales — ver [[Despliegue a Producción]].
 - Auth del WebSocket de tiempo real: pendiente.
 - QR real para enrolamiento de 2FA: pendiente (hoy se muestra el secreto en texto).
 - LLM en producción: el cliente pidió que sea **local**, no cloud — evaluando hardware
@@ -99,8 +103,32 @@ dedicada.
   [[OPNsense y UniFi]]) — `/red` muestra los 7 dispositivos reales (los 2 nodos mock de demo se
   borraron de Postgres). Reboot real y escritura real de VLAN (`DIKTYA-MNG`) quedan habilitados
   si algo los dispara — sin milestone de revisión de seguridad todavía, decisión explícita del
-  usuario de avanzar igual para pruebas. Backend corriendo en background al cierre de la sesión
-  — confirmar al retomar si sigue arriba o hay que levantarlo de nuevo.
+  usuario de avanzar igual para pruebas.
+- **`/red` reescrito: VLANs en vivo, lista mobile-first, doble confirmación (2026-08-03)** —
+  el panel de VLANs pasó de leer `WifiNetwork` en Postgres (tabla que **nunca escribe nadie**,
+  ni sync ni el flujo de reserva/aplicar VLAN — confirmado insertando y borrando una fila de
+  prueba) a consultar UniFi en vivo (`listWifiNetworks`, misma Integration API que reboot/diagnose,
+  botón "Consultar ahora" sin auto-refetch, igual que `UnifiOsRealCard`). `NodeList` ahora tiene
+  variante de cards para mobile/tablet (staff de piso de feria) además de la tabla, con buscador
+  por nombre. El reinicio de nodo pasó de `window.confirm()` a un diálogo real de dos pasos
+  (`ConfirmDestructiveDialog`, impacto → checkbox → confirmar). Badge de frescura de datos junto
+  al título de "Nodos", basado en el `updatedAt` más reciente.
+- **SSIDs transmitidos ahora persistidos y mostrados reales (2026-08-04)** — `normalizeIntegrationDevice`
+  ya calculaba los SSIDs que transmite cada AP, pero se descartaban antes de llegar a Postgres (no
+  había columna). Nueva columna `NetworkNode.ssidsTransmitidos` (`String[]`), escrita por
+  `nodeSync.service.ts::syncNode` en cada sync. `NodeDetailPanel` ("Redes WiFi (SSID)") pasó de leer
+  `node.wifiNetworks` (la relación a la tabla `WifiNetwork` de Postgres, confirmada muerta — ver
+  entrada de arriba sobre VLANs) a `node.ssidsTransmitidos`, así que ahora esa sección muestra datos
+  reales en vez de estar siempre vacía. El backend (`network.service.ts::getApDetail`) todavía
+  incluye la relación `wifiNetworks` en el include de Prisma — queda sin usar por el frontend, no se
+  tocó (limpiarla es sacar la relación completa del schema, decisión aparte).
+- Fix menor: `apiClient.ts` mandaba `Content-Type: application/json` en POST/PATCH sin body; ahora
+  solo lo manda si hay body. `app.ts` agrega manejo explícito de `FST_ERR_CTP_EMPTY_JSON_BODY`
+  (400 en vez de 500 genérico) para cualquier caller que aún mande el header sin body.
+- **Dashboard: desglose de nodos por tipo real, no solo AP (2026-08-04)** — `DashboardSummaryStrip`
+  contaba "APs online/offline" sobre *todos* los nodos sin filtrar por `tipoDispositivo` (switches/
+  UPS/gateway se contaban como si fueran AP). Nuevo `NodesByTypeCard` desglosa por tipo real;
+  `ExpandableCard` es el componente genérico de soporte para esa tarjeta.
 - **Tipo de dispositivo (AP/Switch/Gateway/UPS) con íconos en `/red` (2026-07-30)** — campo real
   `tipoDispositivo`, clasificado server-side desde `features` de la Integration API + casos
   especiales por nombre de modelo (UPS y el gateway real no traen el feature esperado).
@@ -161,6 +189,11 @@ dedicada.
   infraestructura real — **no relacionada con este software**, ver
   [[Plataforma ATLAS (Codex)]] antes de asumir que algo de observabilidad/alertas ya está resuelto
   por otro lado.
+- **Infraestructura de despliegue a producción armada (2026-08-03)** — Docker Compose + Caddy +
+  ZeroTier, validada de punta a punta en local (migraciones, creación de usuario real, login con
+  2FA, workers escribiendo `NodeStatusEvent`, y sincronizada contra el UDM real). Esperando a que
+  el cliente provea la máquina dedicada — ver [[Despliegue a Producción]] para el detalle completo
+  y el runbook.
 
 ## Convenciones del repo
 

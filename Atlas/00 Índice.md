@@ -1,6 +1,6 @@
 ---
 tags: [atlas, indice]
-updated: 2026-07-30
+updated: 2026-08-03
 ---
 
 # Índice — bóveda Atlas
@@ -17,6 +17,8 @@ falta leer todo el vault para tener contexto.
 - [[OPNsense y UniFi]] — panel `/infra`, qué es mock y qué es real hoy.
 - [[Roles y permisos]] — matriz de roles, dónde se aplica el filtro, auth.
 - [[Detección de stands por vision]] — diseño futuro, no implementado (doc completo en el repo).
+- [[Despliegue a Producción]] — artefactos Docker Compose + Caddy + ZeroTier, decisiones acordadas,
+  validado en local, esperando la máquina dedicada del cliente.
 
 ## Infraestructura real (separada del software)
 

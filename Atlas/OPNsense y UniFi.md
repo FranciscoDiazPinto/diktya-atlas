@@ -143,6 +143,13 @@ en el backend pero todavía sin consumir desde el frontend (v1 solo muestra la l
 "no configurado" (503 del backend), mismo patrón que `UnifiOsRealCard`: sin refetch automático,
 botón "Consultar ahora" porque es tráfico real contra un servicio cloud externo.
 
+## VLANs en `/red` ahora también en vivo (2026-08-03)
+
+No es este panel (`/infra`), pero mismo cliente: el panel de VLANs de `/red` pasó de leer
+`WifiNetwork` en Postgres (tabla que nunca escribe nadie — confirmado) a `listWifiNetworks()`
+bajo demanda, igual criterio que `UnifiOsRealCard` acá arriba. Detalle completo →
+[[Proyecto Atlas]] § Estado actual.
+
 ## "Solicitar cambio"
 
 No ejecuta nada directo sobre infraestructura real — crea un ticket (`POST /tickets`, ruta REST
