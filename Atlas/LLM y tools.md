@@ -1,6 +1,6 @@
 ---
 tags: [atlas, netbot, llm, tools]
-updated: 2026-07-29
+updated: 2026-08-06
 ---
 
 # LLM y tools
@@ -49,6 +49,62 @@ rol server-side igual (`executor.ts`), por si el LLM insistiera igual.
 Intercambiable: OpenRouter / Anthropic / OpenAI-compatible, sin tocar el resto del código —
 pensado para poder pasar a un modelo local en producción sin reescribir el orquestador. Ver
 [[Proyecto Atlas]] para la decisión pendiente de hardware/modelo local.
+
+## Gap conocido: propose→reserve→apply de VLAN se puede encadenar sin pasar por la UI de confirmación (2026-08-06)
+
+`PlanDiffCard.tsx` (comentario: *"Nunca un botón único aplicar todo"*) es la UI pensada para que
+reservar y aplicar una VLAN sean dos clicks explícitos y separados, por fila — pero esa tarjeta
+**solo está conectada al flujo de subir un CSV** (`ChatView.tsx::handleCsvResult`), no al
+resultado de la tool `propose_vlan_plan` cuando la invoca el chat.
+
+Como `propose_vlan_plan`, `reserve_vlan` y `apply_vlan_plan` son las tres tools de chat
+disponibles para TECNICO/ADMIN, y el orquestador encadena hasta 6 llamadas por turno según lo
+que el modelo decida (ver "Loop multi-paso" arriba), un usuario que le pida al chat algo como
+"aplicá este cambio de VLAN ya" puede terminar, en un solo turno, con una escritura real contra
+UniFi (`UNIFI_MODE=live` activo) sin que la tarjeta de confirmación aparezca nunca — solo se ven
+los badges verdes de cada tool en el mensaje. Lo único que hoy lo evita es una instrucción en el
+system prompt (`chat.ts::buildSystemPrompt`: *"apply_vlan_plan encola el trabajo real, no lo
+ejecutá vos"*), no un bloqueo técnico.
+
+**Cómo cerrarlo** (no implementado, pendiente de decisión): sacar `reserve_vlan`/`apply_vlan_plan`
+de las tools de chat y forzar ese flujo solo por CSV+UI, o agregar un gate server-side en
+`executor.ts` que exija una confirmación humana explícita (ej. un token de un solo uso emitido
+al mostrar el diff) antes de ejecutar `apply_vlan_plan`, sin importar si vino de UI o del LLM.
+
+## Backlog: tools de diagnóstico/error-control para TECNICO/ADMIN (candidatas, 2026-08-06)
+
+Surgió de la pregunta "qué más ayudaría a técnico/admin con problemas de red desde el chat".
+Ninguna de estas escribe contra UniFi/OPNsense ni depende de tener el cliente OPNsense real
+conectado (ver [[project_atlas_vlans_and_opnsense_next]] en memoria) — todas leen datos que el
+backend ya calcula, solo falta exponerlas. Nada de esto está implementado todavía.
+
+- **`diagnose_node`** — envolver `network.service.ts::diagnoseNode` (ya existe como REST: fuerza
+  una consulta fresca a UniFi para un nodo puntual, en vez de esperar hasta 30s al próximo poll
+  de `worker-monitor`, y persiste el resultado). Hoy `get_ap_detail` solo lee el último estado
+  cacheado en Postgres.
+- **`get_node_history`** — no existe en ningún lado todavía. Cruzar `Alert` + `Ticket` +
+  `NodeStatusEvent` por `nodeId` en un timeline. Cada intento de auto-remediación ya queda
+  narrado paso a paso en la descripción del ticket que genera (`autoRemediation.service.ts`,
+  variable `resumen` + `"Pasos: reset enviado → volvió online..."`), pero solo se ve entrando al
+  ticket individual — un técnico llegando a atender un incidente hoy tiene que ir a buscarlo a
+  mano.
+- **`get_activity_digest`** — envolver el reporte que ya existe entero (`GET /reports/digest`,
+  UI en `/red` § Actividad: alertas/tickets/tiempos de resolución/reservas VLAN por rango de
+  fechas). Es wiring puro, sin lógica nueva.
+- **`get_availability`** — envolver `nodeAvailability.service.ts` (alimenta el dashboard de
+  disponibilidad: % online, historial de conexión, histograma de outages). Responde "¿este AP
+  viene fallando seguido o fue aislado?" antes de escalar a alguien en terreno.
+- **`list_open_issues`** — no existe como tool (sí como vistas en `/red`/`/tickets`). Combinar
+  `Alert` + `Ticket` filtrando `estado != RESUELTO`, opcionalmente por sitio/severidad — pensada
+  como lo primero que pregunta un técnico entrando a un turno.
+- **`assign_ticket`** — hallazgo: el schema ya tiene `Ticket.asignadoAId` (con relación
+  `User "TicketAssignee"`) pero nada lo usa — ni service, ni ruta, ni tool. Campo muerto, mismo
+  patrón que la tabla `WifiNetwork` (ver [[project_atlas_vlans_and_opnsense_next]] en memoria).
+  Agregar `assign_ticket(ticketId, userId)` daría trazabilidad real de "quién se está haciendo
+  cargo" de un incidente.
+
+Los primeros cuatro son básicamente conectar un cable (el service ya calcula todo, falta el tool
+wrapper + schema Zod + entrada en `toolsByRole`). Los últimos dos son lógica nueva pero chica.
 
 ## Ver también
 
