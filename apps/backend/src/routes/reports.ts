@@ -4,6 +4,7 @@ import { authenticate, requireRole } from "../auth/middleware.js";
 import { getActivityDigest } from "../services/activityDigest.service.js";
 import { getAvailability } from "../services/nodeAvailability.service.js";
 import { routeDocs } from "../lib/openapi.js";
+import { startOfToday } from "../lib/dates.js";
 
 const DigestQuerySchema = z.object({
   desde: z.coerce.date().optional(),
@@ -15,12 +16,6 @@ const AvailabilityQuerySchema = z.object({
   desde: z.coerce.date().optional(),
   hasta: z.coerce.date().optional(),
 });
-
-function startOfToday(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
 
 /** Reportes de solo lectura, abiertos a los 3 roles (mismo criterio que /network/status y /events/:id/report). */
 export async function reportRoutes(fastify: FastifyInstance) {

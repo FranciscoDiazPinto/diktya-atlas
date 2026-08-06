@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../db/client.js";
-import { createTicket, resolveTicket, reopenTicket } from "../services/ticket.service.js";
+import { createTicket, resolveTicket, reopenTicket, assignTicket } from "../services/ticket.service.js";
 import { recordAudit } from "../services/audit.service.js";
 import { NotFoundError } from "../lib/errors.js";
 import { authenticate, requireRole } from "../auth/middleware.js";
@@ -22,6 +22,7 @@ const CreateTicketBodySchema = z.object({
 });
 
 const TicketIdParamSchema = z.object({ id: z.string() });
+const AssignTicketBodySchema = z.object({ userId: z.string() });
 
 export async function ticketRoutes(fastify: FastifyInstance) {
   fastify.addHook("preHandler", authenticate);
@@ -106,6 +107,24 @@ export async function ticketRoutes(fastify: FastifyInstance) {
     },
     async (request, reply) => {
       return reply.send(await reopenTicket(request.params.id));
+    }
+  );
+
+  fastify.post<{ Params: { id: string } }>(
+    "/tickets/:id/assign",
+    {
+      preHandler: requireRole("ADMIN", "TECNICO"),
+      attachValidation: true,
+      schema: routeDocs({
+        summary: "Asignar un ticket a un usuario (ADMIN o TECNICO)",
+        tags: ["Tickets"],
+        params: TicketIdParamSchema,
+        body: AssignTicketBodySchema,
+      }),
+    },
+    async (request, reply) => {
+      const { userId } = AssignTicketBodySchema.parse(request.body);
+      return reply.send(await assignTicket(request.params.id, userId));
     }
   );
 }

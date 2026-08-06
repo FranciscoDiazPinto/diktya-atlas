@@ -1,6 +1,6 @@
 import type { AlertSeverity } from "@diktya-atlas/shared";
 import { prisma } from "../db/client.js";
-import { NotFoundError } from "../lib/errors.js";
+import { HttpError, NotFoundError } from "../lib/errors.js";
 
 export interface CreateTicketInput {
   titulo: string;
@@ -31,7 +31,7 @@ export async function createTicket(input: CreateTicketInput) {
 
 export async function addTicketEvent(
   ticketId: string,
-  tipo: "NOTIFICADO" | "REMEDIACION_INTENTADA" | "ESCALADO" | "RESUELTO" | "REABIERTO",
+  tipo: "NOTIFICADO" | "REMEDIACION_INTENTADA" | "ESCALADO" | "RESUELTO" | "REABIERTO" | "ASIGNADO",
   detalle: string
 ) {
   const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
@@ -52,6 +52,27 @@ export async function resolveTicket(ticketId: string) {
 export async function reopenTicket(ticketId: string) {
   await prisma.ticket.update({ where: { id: ticketId }, data: { estado: "ABIERTO" } });
   return addTicketEvent(ticketId, "REABIERTO", "Reabierto");
+}
+
+/**
+ * `Ticket.asignadoAId` existía en el schema desde antes pero no lo escribía
+ * nadie (ni service, ni ruta, ni tool) — ver Atlas/LLM y tools.md § Backlog.
+ * VISUALIZADOR nunca puede ser asignatario: no tiene tools de escritura, no
+ * tendría cómo "hacerse cargo" de un ticket.
+ */
+export async function assignTicket(ticketId: string, userId: string) {
+  const [ticket, user] = await Promise.all([
+    prisma.ticket.findUnique({ where: { id: ticketId } }),
+    prisma.user.findUnique({ where: { id: userId } }),
+  ]);
+  if (!ticket) throw new NotFoundError(`ticket ${ticketId}`);
+  if (!user) throw new NotFoundError(`usuario ${userId}`);
+  if (user.role === "VISUALIZADOR") {
+    throw new HttpError(400, `${user.email} tiene rol VISUALIZADOR — no puede ser asignado a un ticket`);
+  }
+
+  await prisma.ticket.update({ where: { id: ticketId }, data: { asignadoAId: userId } });
+  return addTicketEvent(ticketId, "ASIGNADO", `Asignado a ${user.email}`);
 }
 
 export async function listOpenTicketsForFollowup() {

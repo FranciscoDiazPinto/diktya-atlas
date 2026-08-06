@@ -49,6 +49,28 @@ export const CreateTicketInputSchema = z.object({
   vlanReservationId: z.string().optional(),
 });
 
+export const AssignTicketInputSchema = z.object({
+  ticketId: z.string(),
+  userId: z.string(),
+});
+
+export const ListOpenIssuesInputSchema = z.object({
+  sitio: z.string().optional(),
+  severidad: AlertSeveritySchema.optional(),
+});
+
+export const GetActivityDigestInputSchema = z.object({
+  // ISO date/datetime; si se omiten, el backend usa "hoy" (00:00 -> ahora).
+  desde: z.string().optional(),
+  hasta: z.string().optional(),
+  eventDeploymentId: z.string().optional(),
+});
+
+export const GetAvailabilityInputSchema = z.object({
+  desde: z.string().optional(),
+  hasta: z.string().optional(),
+});
+
 export const EscalateTicketInputSchema = z.object({
   ticketId: z.string(),
   motivo: z.string(),
@@ -95,11 +117,15 @@ export const toolSchemas = {
   get_ap_detail: GetApDetailInputSchema,
   diagnose_node: DiagnoseNodeInputSchema,
   get_node_history: GetNodeHistoryInputSchema,
+  get_activity_digest: GetActivityDigestInputSchema,
+  get_availability: GetAvailabilityInputSchema,
+  list_open_issues: ListOpenIssuesInputSchema,
   propose_vlan_plan: ProposeVlanPlanInputSchema,
   reserve_vlan: ReserveVlanInputSchema,
   apply_vlan_plan: ApplyVlanPlanInputSchema,
   create_ticket: CreateTicketInputSchema,
   escalate_ticket: EscalateTicketInputSchema,
+  assign_ticket: AssignTicketInputSchema,
   notify_technicians: NotifyTechniciansInputSchema,
   list_events: ListEventsInputSchema,
   list_event_zones: ListEventZonesInputSchema,
@@ -121,11 +147,15 @@ export const toolsByRole: Record<z.infer<typeof RoleSchema>, ToolName[]> = {
     "get_ap_detail",
     "diagnose_node",
     "get_node_history",
+    "get_activity_digest",
+    "get_availability",
+    "list_open_issues",
     "propose_vlan_plan",
     "reserve_vlan",
     "apply_vlan_plan",
     "create_ticket",
     "escalate_ticket",
+    "assign_ticket",
     "notify_technicians",
     "list_events",
     "list_event_zones",
@@ -138,10 +168,13 @@ export const toolsByRole: Record<z.infer<typeof RoleSchema>, ToolName[]> = {
     "get_ap_detail",
     "diagnose_node",
     "get_node_history",
+    "get_activity_digest",
+    "list_open_issues",
     "propose_vlan_plan",
     "reserve_vlan",
     "apply_vlan_plan",
     "create_ticket",
+    "assign_ticket",
     "notify_technicians",
     "list_events",
     "list_event_zones",
@@ -151,6 +184,8 @@ export const toolsByRole: Record<z.infer<typeof RoleSchema>, ToolName[]> = {
   ],
   VISUALIZADOR: [
     "get_network_status",
+    "get_activity_digest",
+    "list_open_issues",
     "list_events",
     "list_event_zones",
     "get_coverage_at_point",

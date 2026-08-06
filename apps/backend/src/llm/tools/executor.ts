@@ -7,9 +7,13 @@ import { NotAuthorizedForRoleError } from "../../lib/errors.js";
 import { getUnifiClient } from "../../integrations/unifi/index.js";
 import { getNetworkStatusSummary, getApDetail, diagnoseNode } from "../../services/network.service.js";
 import { getNodeHistory } from "../../services/nodeHistory.service.js";
+import { getActivityDigest } from "../../services/activityDigest.service.js";
+import { getAvailability } from "../../services/nodeAvailability.service.js";
+import { listOpenIssues } from "../../services/openIssues.service.js";
+import { startOfToday } from "../../lib/dates.js";
 import { generateVlanPlan } from "../../services/planDiff.service.js";
 import { reserveVlanPlanItems, enqueueApplyVlanPlan } from "../../services/vlanFlow.service.js";
-import { createTicket, escalateTicket } from "../../services/ticket.service.js";
+import { createTicket, escalateTicket, assignTicket } from "../../services/ticket.service.js";
 import { notifyTechnicians } from "../../services/notification.service.js";
 import { getCoverageAtPoint, findCoverageGaps } from "../../services/coverage.service.js";
 import { placeAp } from "../../services/apPlacement.service.js";
@@ -32,6 +36,18 @@ const handlers: Record<ToolName, ToolHandler> = {
   get_ap_detail: (async (args: { nodeId: string }) => getApDetail(args.nodeId)) as ToolHandler,
   diagnose_node: (async (args: { nodeId: string }) => diagnoseNode(args.nodeId)) as ToolHandler,
   get_node_history: (async (args: { nodeId: string; limit?: number }) => getNodeHistory(args)) as ToolHandler,
+  get_activity_digest: (async (args: { desde?: string; hasta?: string; eventDeploymentId?: string }) =>
+    getActivityDigest({
+      desde: args.desde ? new Date(args.desde) : startOfToday(),
+      hasta: args.hasta ? new Date(args.hasta) : new Date(),
+      eventDeploymentId: args.eventDeploymentId,
+    })) as ToolHandler,
+  get_availability: (async (args: { desde?: string; hasta?: string }) =>
+    getAvailability({
+      desde: args.desde ? new Date(args.desde) : startOfToday(),
+      hasta: args.hasta ? new Date(args.hasta) : new Date(),
+    })) as ToolHandler,
+  list_open_issues: (async (args) => listOpenIssues(args as never)) as ToolHandler,
   propose_vlan_plan: (async (args: { csvRows: never }) =>
     generateVlanPlan(args.csvRows as never, getUnifiClient())) as ToolHandler,
   reserve_vlan: (async (args: { planId: string }, ctx: RequestContext) =>
@@ -41,6 +57,8 @@ const handlers: Record<ToolName, ToolHandler> = {
   create_ticket: (async (args) => createTicket(args as never)) as ToolHandler,
   escalate_ticket: (async (args: { ticketId: string; motivo: string }) =>
     escalateTicket(args.ticketId, args.motivo)) as ToolHandler,
+  assign_ticket: (async (args: { ticketId: string; userId: string }) =>
+    assignTicket(args.ticketId, args.userId)) as ToolHandler,
   notify_technicians: (async (args) => {
     await notifyTechnicians(args as never);
     return { enviado: true };

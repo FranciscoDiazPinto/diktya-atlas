@@ -16,6 +16,12 @@ export const toolDescriptions: Record<ToolName, string> = {
     "Fuerza una consulta EN VIVO a UniFi para un nodo puntual (no espera al próximo polling automático de 30s) y guarda el resultado. Usar cuando el usuario pregunta explícitamente por el estado actual/reciente de un nodo, no el último dato cacheado.",
   get_node_history:
     "Devuelve el historial de un nodo: cambios de estado, alertas y tickets asociados, mezclados en una sola línea de tiempo ordenada de más reciente a más antiguo. Usar para responder '¿qué le pasó a este AP?' o '¿esto ya se intentó arreglar antes?'.",
+  get_activity_digest:
+    "Resume actividad (alertas, tickets con tiempos de resolución, reservas de VLAN, auditoría) en un rango de fechas, opcionalmente acotado a un evento. Si no se dan fechas, es 'hoy'.",
+  get_availability:
+    "Disponibilidad real por nodo en un rango de fechas: % online, serie temporal, histograma de duración de cortes. A partir de cambios de estado reales, no de un poll periódico.",
+  list_open_issues:
+    "Lista lo que queda pendiente ahora mismo: tickets sin resolver y alertas que todavía no generaron ticket, opcionalmente filtrado por sitio/severidad. Usar para '¿qué hay pendiente?' al arrancar un turno.",
   propose_vlan_plan:
     "A partir de filas de CSV (nombre_red, vlan_id, ssid, banda, sitio), genera un plan de cambios (diff) contra el estado actual. NO escribe nada todavía.",
   reserve_vlan:
@@ -24,6 +30,7 @@ export const toolDescriptions: Record<ToolName, string> = {
     "Aplica una reserva de VLAN ya confirmada por el usuario. Encola el trabajo real en worker-remediation; nunca escribe directo.",
   create_ticket: "Crea un ticket de incidencia con severidad, descripción y nodo/reserva asociados.",
   escalate_ticket: "Escala un ticket existente (ej. a un admin) indicando el motivo.",
+  assign_ticket: "Asigna un ticket a un usuario (ADMIN o TECNICO) para dejar trazabilidad de quién se está haciendo cargo.",
   notify_technicians: "Envía una notificación al grupo de técnicos configurado, con severidad y mensaje.",
   list_events:
     "Lista eventos (opcionalmente filtrados por nombre, ej. 'Expomin') para encontrar el eventDeploymentId antes de listar sus zonas.",
