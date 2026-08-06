@@ -1,6 +1,6 @@
 ---
 tags: [atlas, netbot, roles, seguridad]
-updated: 2026-07-29
+updated: 2026-08-06
 ---
 
 # Roles y permisos
@@ -42,6 +42,17 @@ rotado (cookie httpOnly/secure/sameSite=strict, reutilización revoca todas las 
 2FA obligatorio para ADMIN/TECNICO (VISUALIZADOR exento). Fallback de dev por headers
 (`x-role`/`x-user-id`), forzado a `false` si `NODE_ENV=production` sin importar la config —
 nunca debe ser alcanzable en producción.
+
+**Bug real encontrado y corregido (2026-08-05)**: `AuthContext` solo llamaba `POST /auth/refresh`
+una vez, al montar la app — ninguna sesión dejada abierta más de los 15 min del access token se
+recuperaba sola, todo devolvía 401 sin fin (confirmado en los logs reales del stack
+`netbot-prodtest-*`: una ráfaga de una docena de `/network/status` fallando 401 en la misma
+milésima de segundo). Ahora `AuthContext` renueva proactivamente 1 min antes de esos 15 min
+(después de cada login/2FA/refresh exitoso), y `apiClient.ts` reintenta una vez cualquier request
+que reciba 401, pidiendo un token fresco antes de reintentar. Ambos caminos comparten el mismo
+refresh deduplicado (`refreshInFlightRef`) para que varias requests golpeadas por un 401 al mismo
+tiempo no manden el refresh token dos veces — reusarlo se trata como robo de sesión y revoca
+todas las sesiones del usuario.
 
 ## Ver también
 

@@ -1,6 +1,6 @@
 ---
 tags: [atlas, netbot, documentacion]
-updated: 2026-08-03
+updated: 2026-08-06
 ---
 
 # Diktya Atlas — NetBot
@@ -129,6 +129,10 @@ dedicada.
   contaba "APs online/offline" sobre *todos* los nodos sin filtrar por `tipoDispositivo` (switches/
   UPS/gateway se contaban como si fueran AP). Nuevo `NodesByTypeCard` desglosa por tipo real;
   `ExpandableCard` es el componente genérico de soporte para esa tarjeta.
+- **Dos tools de chat nuevas para diagnóstico (2026-08-06)** — `diagnose_node` (fuerza consulta
+  en vivo a UniFi para un nodo, ver [[OPNsense y UniFi]]) y `get_node_history` (timeline de
+  cambios de estado + alertas + tickets de un nodo). Primeras dos del backlog en
+  [[LLM y tools]] § Backlog — ADMIN/TECNICO solamente, mismo criterio que `get_ap_detail`.
 - **Tipo de dispositivo (AP/Switch/Gateway/UPS) con íconos en `/red` (2026-07-30)** — campo real
   `tipoDispositivo`, clasificado server-side desde `features` de la Integration API + casos
   especiales por nombre de modelo (UPS y el gateway real no traen el feature esperado).

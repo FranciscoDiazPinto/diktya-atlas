@@ -31,6 +31,10 @@ no podían resolver el pronombre.
 ## Tools disponibles (`packages/shared/src/tools.ts`)
 
 - `get_network_status`, `get_ap_detail` — lectura
+- `diagnose_node` — fuerza una consulta en vivo a UniFi para un nodo puntual (ADMIN/TECNICO,
+  mismo criterio de rol que el REST `/network/nodes/:id/diagnose` — dispara tráfico real, no es
+  un GET de caché)
+- `get_node_history` — timeline de un nodo (cambios de estado + alertas + tickets), ADMIN/TECNICO
 - `propose_vlan_plan` — genera un diff, no escribe nada
 - `reserve_vlan` — reserva (no aplica)
 - `apply_vlan_plan` — encola la escritura real en el worker
@@ -76,35 +80,34 @@ al mostrar el diff) antes de ejecutar `apply_vlan_plan`, sin importar si vino de
 Surgió de la pregunta "qué más ayudaría a técnico/admin con problemas de red desde el chat".
 Ninguna de estas escribe contra UniFi/OPNsense ni depende de tener el cliente OPNsense real
 conectado (ver [[project_atlas_vlans_and_opnsense_next]] en memoria) — todas leen datos que el
-backend ya calcula, solo falta exponerlas. Nada de esto está implementado todavía.
+backend ya calcula, solo falta exponerlas.
 
-- **`diagnose_node`** — envolver `network.service.ts::diagnoseNode` (ya existe como REST: fuerza
-  una consulta fresca a UniFi para un nodo puntual, en vez de esperar hasta 30s al próximo poll
-  de `worker-monitor`, y persiste el resultado). Hoy `get_ap_detail` solo lee el último estado
-  cacheado en Postgres.
-- **`get_node_history`** — no existe en ningún lado todavía. Cruzar `Alert` + `Ticket` +
-  `NodeStatusEvent` por `nodeId` en un timeline. Cada intento de auto-remediación ya queda
-  narrado paso a paso en la descripción del ticket que genera (`autoRemediation.service.ts`,
-  variable `resumen` + `"Pasos: reset enviado → volvió online..."`), pero solo se ve entrando al
-  ticket individual — un técnico llegando a atender un incidente hoy tiene que ir a buscarlo a
-  mano.
-- **`get_activity_digest`** — envolver el reporte que ya existe entero (`GET /reports/digest`,
+- [x] **`diagnose_node`** (2026-08-06) — envuelve `network.service.ts::diagnoseNode` (ya existía
+  como REST). Tests: `test/toolRegistry.test.ts`.
+- [x] **`get_node_history`** (2026-08-06) — nuevo `services/nodeHistory.service.ts`, cruza
+  `Alert` + `Ticket` + `NodeStatusEvent` por `nodeId` en un timeline ordenado desc, `limit`
+  aplicado por categoría antes de mezclar. Cada intento de auto-remediación ya queda narrado
+  paso a paso en la descripción del ticket que genera (`autoRemediation.service.ts`, variable
+  `resumen` + `"Pasos: reset enviado → volvió online..."`), pero antes solo se veía entrando al
+  ticket individual. Tests: `test/nodeHistory.service.test.ts`, `test/toolRegistry.test.ts`.
+- [ ] **`get_activity_digest`** — envolver el reporte que ya existe entero (`GET /reports/digest`,
   UI en `/red` § Actividad: alertas/tickets/tiempos de resolución/reservas VLAN por rango de
   fechas). Es wiring puro, sin lógica nueva.
-- **`get_availability`** — envolver `nodeAvailability.service.ts` (alimenta el dashboard de
+- [ ] **`get_availability`** — envolver `nodeAvailability.service.ts` (alimenta el dashboard de
   disponibilidad: % online, historial de conexión, histograma de outages). Responde "¿este AP
   viene fallando seguido o fue aislado?" antes de escalar a alguien en terreno.
-- **`list_open_issues`** — no existe como tool (sí como vistas en `/red`/`/tickets`). Combinar
+- [ ] **`list_open_issues`** — no existe como tool (sí como vistas en `/red`/`/tickets`). Combinar
   `Alert` + `Ticket` filtrando `estado != RESUELTO`, opcionalmente por sitio/severidad — pensada
   como lo primero que pregunta un técnico entrando a un turno.
-- **`assign_ticket`** — hallazgo: el schema ya tiene `Ticket.asignadoAId` (con relación
+- [ ] **`assign_ticket`** — hallazgo: el schema ya tiene `Ticket.asignadoAId` (con relación
   `User "TicketAssignee"`) pero nada lo usa — ni service, ni ruta, ni tool. Campo muerto, mismo
   patrón que la tabla `WifiNetwork` (ver [[project_atlas_vlans_and_opnsense_next]] en memoria).
   Agregar `assign_ticket(ticketId, userId)` daría trazabilidad real de "quién se está haciendo
   cargo" de un incidente.
 
-Los primeros cuatro son básicamente conectar un cable (el service ya calcula todo, falta el tool
-wrapper + schema Zod + entrada en `toolsByRole`). Los últimos dos son lógica nueva pero chica.
+De las cuatro restantes, `get_activity_digest` y `get_availability` son básicamente conectar un
+cable (el service ya calcula todo, falta el tool wrapper + schema Zod + entrada en
+`toolsByRole`) — `list_open_issues` y `assign_ticket` son lógica nueva pero chica.
 
 ## Ver también
 
