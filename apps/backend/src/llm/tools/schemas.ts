@@ -12,6 +12,10 @@ export const toolDescriptions: Record<ToolName, string> = {
     "Obtiene el estado resumido de la red (APs online/offline, alertas activas) para un sitio, o para todos si no se especifica.",
   get_ap_detail:
     "Obtiene el detalle de un AP específico: señal, clientes conectados, SSIDs transmitidos, uptime.",
+  diagnose_node:
+    "Fuerza una consulta EN VIVO a UniFi para un nodo puntual (no espera al próximo polling automático de 30s) y guarda el resultado. Usar cuando el usuario pregunta explícitamente por el estado actual/reciente de un nodo, no el último dato cacheado.",
+  get_node_history:
+    "Devuelve el historial de un nodo: cambios de estado, alertas y tickets asociados, mezclados en una sola línea de tiempo ordenada de más reciente a más antiguo. Usar para responder '¿qué le pasó a este AP?' o '¿esto ya se intentó arreglar antes?'.",
   propose_vlan_plan:
     "A partir de filas de CSV (nombre_red, vlan_id, ssid, banda, sitio), genera un plan de cambios (diff) contra el estado actual. NO escribe nada todavía.",
   reserve_vlan:

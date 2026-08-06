@@ -20,6 +20,15 @@ export const GetApDetailInputSchema = z.object({
   nodeId: z.string(),
 });
 
+export const DiagnoseNodeInputSchema = z.object({
+  nodeId: z.string(),
+});
+
+export const GetNodeHistoryInputSchema = z.object({
+  nodeId: z.string(),
+  limit: z.number().int().positive().max(50).optional(),
+});
+
 export const ProposeVlanPlanInputSchema = z.object({
   csvRows: z.array(CsvRowSchema),
 });
@@ -84,6 +93,8 @@ export const PlaceApInputSchema = z.object({
 export const toolSchemas = {
   get_network_status: GetNetworkStatusInputSchema,
   get_ap_detail: GetApDetailInputSchema,
+  diagnose_node: DiagnoseNodeInputSchema,
+  get_node_history: GetNodeHistoryInputSchema,
   propose_vlan_plan: ProposeVlanPlanInputSchema,
   reserve_vlan: ReserveVlanInputSchema,
   apply_vlan_plan: ApplyVlanPlanInputSchema,
@@ -108,6 +119,8 @@ export const toolsByRole: Record<z.infer<typeof RoleSchema>, ToolName[]> = {
   ADMIN: [
     "get_network_status",
     "get_ap_detail",
+    "diagnose_node",
+    "get_node_history",
     "propose_vlan_plan",
     "reserve_vlan",
     "apply_vlan_plan",
@@ -123,6 +136,8 @@ export const toolsByRole: Record<z.infer<typeof RoleSchema>, ToolName[]> = {
   TECNICO: [
     "get_network_status",
     "get_ap_detail",
+    "diagnose_node",
+    "get_node_history",
     "propose_vlan_plan",
     "reserve_vlan",
     "apply_vlan_plan",

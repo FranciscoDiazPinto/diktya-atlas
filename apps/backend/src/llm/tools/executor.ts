@@ -5,7 +5,8 @@ import { toolSchemaFor } from "./schemas.js";
 import { recordAudit } from "../../services/audit.service.js";
 import { NotAuthorizedForRoleError } from "../../lib/errors.js";
 import { getUnifiClient } from "../../integrations/unifi/index.js";
-import { getNetworkStatusSummary, getApDetail } from "../../services/network.service.js";
+import { getNetworkStatusSummary, getApDetail, diagnoseNode } from "../../services/network.service.js";
+import { getNodeHistory } from "../../services/nodeHistory.service.js";
 import { generateVlanPlan } from "../../services/planDiff.service.js";
 import { reserveVlanPlanItems, enqueueApplyVlanPlan } from "../../services/vlanFlow.service.js";
 import { createTicket, escalateTicket } from "../../services/ticket.service.js";
@@ -29,6 +30,8 @@ type ToolHandler = (args: never, ctx: RequestContext) => Promise<unknown>;
 const handlers: Record<ToolName, ToolHandler> = {
   get_network_status: (async (args: { sitio?: string }) => getNetworkStatusSummary(args.sitio)) as ToolHandler,
   get_ap_detail: (async (args: { nodeId: string }) => getApDetail(args.nodeId)) as ToolHandler,
+  diagnose_node: (async (args: { nodeId: string }) => diagnoseNode(args.nodeId)) as ToolHandler,
+  get_node_history: (async (args: { nodeId: string; limit?: number }) => getNodeHistory(args)) as ToolHandler,
   propose_vlan_plan: (async (args: { csvRows: never }) =>
     generateVlanPlan(args.csvRows as never, getUnifiClient())) as ToolHandler,
   reserve_vlan: (async (args: { planId: string }, ctx: RequestContext) =>
