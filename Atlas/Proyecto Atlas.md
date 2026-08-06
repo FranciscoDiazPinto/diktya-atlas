@@ -88,6 +88,9 @@ dedicada.
 - Cliente OPNsense real: no implementado (mock funcional, ver [[OPNsense y UniFi]]) — **próximo
   paso acordado con el usuario** (2026-08-03): conectarlo real con restricción de roles
   admin/técnico.
+- **WhatsApp + entrega de vouchers de red a clientes: en pausa (2026-08-06)**, ver
+  [[WhatsApp y credenciales de invitados]] — bloqueado en una decisión de gobernanza de la infra
+  real (cuenta clásica de UniFi para hotspot/vouchers) que el usuario va a consultar con Lucas.
 - Gestión de usuarios/roles desde el panel Admin: sigue sin UI, pero desde 2026-08-03 hay un
   script CLI (`apps/backend/prisma/createUser.ts`, `pnpm user:create`) que cubre la necesidad
   inmediata de crear cuentas reales — ver [[Despliegue a Producción]].

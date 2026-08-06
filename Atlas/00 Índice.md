@@ -1,6 +1,6 @@
 ---
 tags: [atlas, indice]
-updated: 2026-08-03
+updated: 2026-08-06
 ---
 
 # Índice — bóveda Atlas
@@ -19,6 +19,9 @@ falta leer todo el vault para tener contexto.
 - [[Detección de stands por vision]] — diseño futuro, no implementado (doc completo en el repo).
 - [[Despliegue a Producción]] — artefactos Docker Compose + Caddy + ZeroTier, decisiones acordadas,
   validado en local, esperando la máquina dedicada del cliente.
+- [[WhatsApp y credenciales de invitados]] — **en pausa**, esperando definición con Lucas: soporte
+  a clientes por WhatsApp + entrega de vouchers de red, bloqueado en una decisión de gobernanza de
+  la API clásica de UniFi.
 
 ## Infraestructura real (separada del software)
 
