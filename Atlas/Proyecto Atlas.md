@@ -129,10 +129,11 @@ dedicada.
   contaba "APs online/offline" sobre *todos* los nodos sin filtrar por `tipoDispositivo` (switches/
   UPS/gateway se contaban como si fueran AP). Nuevo `NodesByTypeCard` desglosa por tipo real;
   `ExpandableCard` es el componente genérico de soporte para esa tarjeta.
-- **Dos tools de chat nuevas para diagnóstico (2026-08-06)** — `diagnose_node` (fuerza consulta
-  en vivo a UniFi para un nodo, ver [[OPNsense y UniFi]]) y `get_node_history` (timeline de
-  cambios de estado + alertas + tickets de un nodo). Primeras dos del backlog en
-  [[LLM y tools]] § Backlog — ADMIN/TECNICO solamente, mismo criterio que `get_ap_detail`.
+- **Backlog de tools de diagnóstico/error-control completo (2026-08-06)** — `diagnose_node`,
+  `get_node_history`, `get_activity_digest`, `get_availability`, `list_open_issues` y
+  `assign_ticket`, ver [[LLM y tools]] § Tools disponibles / Backlog para el detalle y el rol de
+  cada una. `assign_ticket` de paso cerró el hallazgo de `Ticket.asignadoAId` (columna que existía
+  hace rato sin que nada la escribiera).
 - **Tipo de dispositivo (AP/Switch/Gateway/UPS) con íconos en `/red` (2026-07-30)** — campo real
   `tipoDispositivo`, clasificado server-side desde `features` de la Integration API + casos
   especiales por nombre de modelo (UPS y el gateway real no traen el feature esperado).

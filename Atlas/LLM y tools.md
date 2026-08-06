@@ -35,18 +35,27 @@ no podían resolver el pronombre.
   mismo criterio de rol que el REST `/network/nodes/:id/diagnose` — dispara tráfico real, no es
   un GET de caché)
 - `get_node_history` — timeline de un nodo (cambios de estado + alertas + tickets), ADMIN/TECNICO
+- `get_activity_digest` — digest de actividad por rango de fechas, los 3 roles (mismo criterio
+  que el REST `/reports/digest`)
+- `get_availability` — % disponibilidad/histograma de cortes por rango, **solo ADMIN** (mismo
+  criterio que el REST `/reports/availability`, distinto del resto de las tools de lectura)
+- `list_open_issues` — tickets sin resolver + alertas sin ticket todavía, los 3 roles
 - `propose_vlan_plan` — genera un diff, no escribe nada
 - `reserve_vlan` — reserva (no aplica)
 - `apply_vlan_plan` — encola la escritura real en el worker
 - `create_ticket`, `escalate_ticket`, `notify_technicians`
+- `assign_ticket` — asigna un ticket a un usuario ADMIN/TECNICO (nunca a VISUALIZADOR, ni como
+  tool ni como asignatario — ver `ticket.service.ts::assignTicket`)
 - `list_events`, `list_event_zones` — resolución de nombres a IDs
 - `get_coverage_at_point`, `find_coverage_gaps`, `place_ap` — mapeo de planos, ver
   [[Mapeo de planos y cobertura]]
 
 Filtro por rol (`toolsByRole`, ver [[Roles y permisos]]): VISUALIZADOR solo tiene las de lectura
-+ mapeo; TECNICO suma tickets/VLAN/notificaciones; ADMIN suma `escalate_ticket`. El filtrado
-pasa en dos capas — el LLM ni ve las tools que su rol no puede usar, y el backend revalida el
-rol server-side igual (`executor.ts`), por si el LLM insistiera igual.
++ mapeo (más `get_activity_digest`/`list_open_issues`, que son lectura abierta a los 3 roles);
+TECNICO suma tickets/VLAN/notificaciones/`diagnose_node`/`get_node_history`/`assign_ticket`; ADMIN
+suma `escalate_ticket` y `get_availability` (la única tool restringida a ADMIN solo, calcada del
+REST). El filtrado pasa en dos capas — el LLM ni ve las tools que su rol no puede usar, y el
+backend revalida el rol server-side igual (`executor.ts`), por si el LLM insistiera igual.
 
 ## Proveedor LLM
 
@@ -90,24 +99,25 @@ backend ya calcula, solo falta exponerlas.
   paso a paso en la descripción del ticket que genera (`autoRemediation.service.ts`, variable
   `resumen` + `"Pasos: reset enviado → volvió online..."`), pero antes solo se veía entrando al
   ticket individual. Tests: `test/nodeHistory.service.test.ts`, `test/toolRegistry.test.ts`.
-- [ ] **`get_activity_digest`** — envolver el reporte que ya existe entero (`GET /reports/digest`,
-  UI en `/red` § Actividad: alertas/tickets/tiempos de resolución/reservas VLAN por rango de
-  fechas). Es wiring puro, sin lógica nueva.
-- [ ] **`get_availability`** — envolver `nodeAvailability.service.ts` (alimenta el dashboard de
-  disponibilidad: % online, historial de conexión, histograma de outages). Responde "¿este AP
-  viene fallando seguido o fue aislado?" antes de escalar a alguien en terreno.
-- [ ] **`list_open_issues`** — no existe como tool (sí como vistas en `/red`/`/tickets`). Combinar
-  `Alert` + `Ticket` filtrando `estado != RESUELTO`, opcionalmente por sitio/severidad — pensada
-  como lo primero que pregunta un técnico entrando a un turno.
-- [ ] **`assign_ticket`** — hallazgo: el schema ya tiene `Ticket.asignadoAId` (con relación
-  `User "TicketAssignee"`) pero nada lo usa — ni service, ni ruta, ni tool. Campo muerto, mismo
-  patrón que la tabla `WifiNetwork` (ver [[project_atlas_vlans_and_opnsense_next]] en memoria).
-  Agregar `assign_ticket(ticketId, userId)` daría trazabilidad real de "quién se está haciendo
-  cargo" de un incidente.
+- [x] **`get_activity_digest`** (2026-08-06) — envuelve `activityDigest.service.ts` (ya existía
+  como REST, `/reports/digest`). Abierta a los 3 roles, mismo criterio que el REST. Wiring puro.
+- [x] **`get_availability`** (2026-08-06) — envuelve `nodeAvailability.service.ts` (ya existía
+  como REST, `/reports/availability`). **Solo ADMIN** — el REST la restringe así (mismo criterio
+  que `/opnsense/status`/`/unifi-os/status`, las otras vistas de `/infra`), a diferencia de lo que
+  decía esta entrada originalmente ("ADMIN/TECNICO"); quedó corregido al implementar.
+- [x] **`list_open_issues`** (2026-08-06) — nuevo `services/openIssues.service.ts`. Dos listas
+  separadas, no mezcladas: tickets con `estado != RESUELTO`, y alertas con `ticketId: null`
+  (alertas que todavía no generaron ticket) — evita duplicar una alerta que ya tiene su ticket.
+  Filtrable por `sitio`/`severidad`. Abierta a los 3 roles (mismo criterio que el REST `GET
+  /tickets`, sin gate de rol).
+- [x] **`assign_ticket`** (2026-08-06) — cerrado el hallazgo: `ticket.service.ts::assignTicket`
+  ahora escribe `Ticket.asignadoAId`, rechaza asignar a un VISUALIZADOR (400), y deja un
+  `TicketEvent` — se agregó `ASIGNADO` a `TicketEventType` (migración
+  `20260806163917_add_asignado_ticket_event_type`). También tiene REST (`POST
+  /tickets/:id/assign`, ADMIN/TECNICO) para parity con resolve/reopen, aunque no hay UI todavía.
 
-De las cuatro restantes, `get_activity_digest` y `get_availability` son básicamente conectar un
-cable (el service ya calcula todo, falta el tool wrapper + schema Zod + entrada en
-`toolsByRole`) — `list_open_issues` y `assign_ticket` son lógica nueva pero chica.
+Backlog original completo. Tests: `test/openIssues.service.test.ts`,
+`test/ticket.service.assignTicket.test.ts`, `test/toolRegistry.test.ts` (gating de rol de las 4).
 
 ## Ver también
 
