@@ -1,6 +1,6 @@
 ---
 tags: [atlas, infraestructura, diktya]
-updated: 2026-07-30
+updated: 2026-08-07
 ---
 
 # Infraestructura real de Diktya Atlas
@@ -24,6 +24,32 @@ Operador de red para eventos móviles (expos, ferias). Activos **permanentes**:
 | UniFi Controller | Gestión WiFi                 | `192.168.1.1` (interno) / `https://10.71.111.101:8443` vía ZT (2026-07-29, ver [[Rutas de Red]]) | **UDM Enterprise Fortress Gateway** (`UDMENT`, shortName "EFG" — coincide con `UNIFI-EFG-01_credenciales.txt` y la ruta de rescate EFG), corre **UniFi OS** (no el controller clásico self-hosted) → soporta API key nativa. No confundir `192.168.1.1` con el router local de este equipo de desarrollo, que coincide en IP |
 | SMV-01 / SMV-02  | Proxmox                      | `10.71.111.201:8006` / `10.71.111.202:8006`                                                      | Independientes, **no clusterizados**                                                                                                                                                                                                                                                                                         |
 | MikroTik Chateau | Camino OOB de rescate vía 5G | `10.71.111.11`                                                                                   | **"No lo toques"** — un error ahí deja el sitio incomunicado y sin forma de arreglarlo a distancia                                                                                                                                                                                                                           |
+
+## VM de NetBot en Proxmox (decidido con Lucas, 2026-08-07)
+
+NetBot deja de depender de "una máquina dedicada que el cliente va a proveer" (decisión anterior,
+ver [[Despliegue a Producción]] — **superada**) — corre en una VM dentro del Proxmox real.
+
+- **Ubicación confirmada por el usuario**: Proxmox (SMV-01/SMV-02) está físicamente dentro de
+  **RACK-A**. Como RACK-B no viaja a septiembre (decisión ya tomada) y RACK-A sí, la VM de NetBot
+  queda automáticamente del lado que va al evento — no importa cuál de los dos SMV específicos
+  use Lucas para crearla.
+- **Capacidad libre reportada por Lucas (2026-08-07)**: cada nodo (SMV-01/SMV-02) tiene 12
+  núcleos, ~20 GB RAM libre y 320+ GB de disco, sin ninguna VM corriendo todavía.
+- **VM, no LXC**: Docker Compose dentro de LXC exige nesting + keyctl, fricción evitable —
+  sería la primera VM del proyecto (todo lo demás, incluida la plataforma ATLAS de Codex, corre
+  en LXC).
+- **Red**: la VM va en la **VLAN de gestión** local (mismo rack que los cores), habla directo a
+  CORE-01/CORE-02 y a UniFi (`192.168.1.1`) por esa VLAN — no ZeroTier (ver [[Rutas de Red]] para
+  el razonamiento completo de por qué ZeroTier no tiene sentido para tráfico intra-rack).
+- **DNS interno: no existe todavía.** Lucas verificó que ni `atlas-mon-aa` ni
+  `core01.diktya.local` resuelven por ningún camino — si NetBot necesita un nombre interno (en
+  vez de o además del dominio público `netbot.diktya.cl` vía Cloudflare, ver
+  [[Despliegue a Producción]]), hay que crear la zona antes de poder emitir cualquier certificado
+  para él.
+- **Pendientes de Lucas, referenciados por ticket**: P-59 (endurecer regla de ZeroTier, antes de
+  septiembre — motivo por el que el bridge `10.71.111.101:8443` no es fiable a mediano plazo, ver
+  [[Rutas de Red]]), P-61 (ese mismo bridge nunca se replicó a CORE-02).
 
 ## Reglas de "no tocar" (gobernanza operativa)
 

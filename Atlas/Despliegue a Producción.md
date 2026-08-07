@@ -1,6 +1,6 @@
 ---
 tags: [atlas, netbot, deploy, infraestructura]
-updated: 2026-08-03
+updated: 2026-08-07
 ---
 
 # Despliegue a producción — NetBot
@@ -10,11 +10,13 @@ eventos, ver [[Infraestructura Real]]) a un ambiente de producción de verdad. D
 completo vive en el repo (`DEPLOY.md`, `SECURITY.md` § Estrategia de despliegue) — esta nota es el
 resumen de decisiones y estado.
 
-## Decisiones acordadas con el usuario (2026-08-03)
+## Decisiones acordadas con el usuario (2026-08-03, host superado 2026-08-07)
 
-- **Host**: una máquina dedicada que el cliente va a proveer — todavía no existe/no es accesible.
-  No es SMV-01/02 (Proxmox real), ni esta laptop, ni cloud — el deploy es host-agnóstico
-  (Docker + Docker Compose) a propósito, para no depender de eso.
+- **Host — CAMBIADO (2026-08-07)**: ya no es una máquina externa que el cliente provee (esa
+  decisión queda superada). Corre en una **VM dentro de Proxmox real** (SMV-01/SMV-02, dentro de
+  RACK-A — ver [[Infraestructura Real]] § VM de NetBot en Proxmox), que Lucas crea con su acceso
+  Administrator. El deploy sigue siendo Docker + Docker Compose (host-agnóstico en el software,
+  solo cambió dónde vive la VM).
 - **Acceso remoto del equipo**: se reusa **ZeroTier** (red `diktya-atlas-mgmt`,
   `76fc96e498382f09`) — ya desplegado y en uso real hoy para llegar a OPNsense/UniFi (ver
   [[Rutas de Red]]). Se descartó Tailscale, la recomendación original de `SECURITY.md`, para no
@@ -35,6 +37,13 @@ Sin CORS en producción (mismo origen). Ningún servicio publica puerto salvo el
 
 TLS real vía **DNS-01 de Cloudflare** (dominio `diktya.cl`) — no requiere que la máquina sea
 alcanzable públicamente, solo control del DNS. Evita el warning de certificado autofirmado.
+
+**Objeción de Lucas (2026-08-07), sin resolver todavía**: esto mete una dependencia de internet
+(salir a Cloudflare) en una herramienta pensada para terreno — si el sitio del evento se queda
+sin salida a internet (ya pasó: Starlink/WAN_901 estuvo días sin IP, ver [[Infraestructura Real]]),
+la renovación del certificado no puede completarse. Alternativa no evaluada todavía: certificado
+interno (requiere la zona DNS interna que hoy no existe, ver § VM de NetBot en Proxmox en
+[[Infraestructura Real]]) o aceptar el warning de autofirmado para uso interno.
 
 ## Artefactos (en el repo)
 

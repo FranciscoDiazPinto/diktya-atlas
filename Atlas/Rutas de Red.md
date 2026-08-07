@@ -1,6 +1,6 @@
 ---
 tags: [atlas, infraestructura, redes, rutas]
-updated: 2026-08-03
+updated: 2026-08-07
 ---
 
 # Rutas de red documentadas
@@ -41,6 +41,23 @@ temporal — no asumir que va a seguir estando disponible mañana sin volver a p
 Esto significa que, mientras este port-forward siga activo, **no hace falta levantar WireGuard**
 para llegar al UniFi real desde este equipo — alcanza con `https://10.71.111.101:8443` (ver
 [[Infraestructura Real]] para el estado de acceso actualizado).
+
+**Resuelto con Lucas (2026-08-07)**: confirmó que este puente `rdr pass` lo montó él mismo el
+2026-07-29 puntualmente para que Francisco llegara a la consola **desde fuera** — no está pensado
+para que el producto (NetBot) dependa de él. Tres motivos para no construir contra
+`10.71.111.101:8443`:
+1. Se rompe cuando se endurezca la regla de ZeroTier (**P-59**, tarea de Lucas previa a
+   septiembre).
+2. Se rompe si el puente se retira (siempre fue temporal).
+3. Solo existe en CORE-01 — nunca se replicó a CORE-02 (**P-61**), así que un failover de CARP
+   lo deja ciego.
+
+UniFi real vive en `192.168.1.1` (interno). Una vez que NetBot corra en una VM dentro de la
+**VLAN de gestión** (co-ubicada en el mismo rack que los cores, ver [[Despliegue a Producción]]),
+debe hablarle directo a esa IP por la VLAN — ni el puente, ni ZeroTier (que tampoco tiene sentido
+para tráfico local: agregaría latencia y una dependencia de terceros para alcanzar algo a dos
+switches de distancia). ZeroTier queda para lo que documenta esta nota: el plano OOB de rescate,
+y para acceso remoto puntual de personas (como el propio Francisco hoy, desde fuera del rack).
 
 ### Tercera opción, agregada 2026-08-03 — Site Manager Connector (sin port-forward ni WireGuard)
 

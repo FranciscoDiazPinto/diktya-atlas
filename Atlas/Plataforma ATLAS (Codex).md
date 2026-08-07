@@ -1,6 +1,6 @@
 ---
 tags: [atlas, netbot, codex, infraestructura]
-updated: 2026-07-31
+updated: 2026-08-07
 ---
 
 # Plataforma ATLAS (de Codex) — no confundir con NetBot
@@ -14,7 +14,9 @@ entre sí.**
 ## Qué es
 
 API FastAPI + colector propio + observabilidad, corriendo en LXC sobre Proxmox (`mon-aa`/`mon-bb`,
-`10.100.25.245`/`.244`, ver [[Infraestructura Real]]):
+`10.100.25.245`/`.244`, ver [[Infraestructura Real]]). API real en `10.100.25.245:8000`
+(confirmado por Lucas 2026-08-07, ya con **21 rutas** — creció desde las ~10 documentadas acá el
+2026-07-30):
 
 | Componente | Estado (verificado 2026-07-27) |
 |---|---|
@@ -42,11 +44,27 @@ Importante: esa regla es sobre **su** ecosistema de agentes (Telegram + Cloud + 
 especialistas), no una regla que NetBot esté obligado a seguir — son proyectos independientes
 (ver decisión abajo).
 
-## Decisión (Francisco, 2026-07-30)
+## Decisión (Francisco, 2026-07-30) — EN REVISIÓN desde 2026-08-07
 
 **NetBot y ATLAS son desarrollos deliberadamente independientes — no se van a unificar.** NetBot
 sigue hablándole directo a UniFi vía la Integration API (ver [[OPNsense y UniFi]]), no a través de
 la API de ATLAS.
+
+**Objeción real de Lucas (2026-08-07)**, al revisar el plan de VM para NetBot en Proxmox: dos
+sistemas sondeando los mismos equipos es doble carga sobre las APIs de los cores/UniFi, dos
+fuentes de verdad sobre el estado de la red, y dos bots de Telegram avisando del mismo incidente
+— "el día que algo se caiga, ¿cuál tiene razón?". Su recomendación: NetBot consuma la API de
+ATLAS (`10.100.25.245:8000`, sin auth) en vez de sondear directo, y así deja de pedir
+credenciales de red reales — pasaría a aportar tickets/flujo de trabajo/chat sobre datos que
+ATLAS ya recolecta, no a duplicar la recolección.
+
+**Estado (2026-08-07): sin resolver.** El usuario se inclina en primera instancia por revertir la
+decisión de independencia y consumir la API de ATLAS, pero quiere confirmarlo con Lucas antes de
+cerrarlo — no re-derivar esto como decidido hasta que se confirme. Si se revierte, implica
+reescribir la capa `integrations/unifi`/`integrations/opnsense` de NetBot para leer de ATLAS en
+vez de hablarle directo a UniFi/OPNsense (el cliente OPNsense real recién implementado hoy, ver
+[[OPNsense y UniFi]], quedaría reemplazado, no descartado como trabajo — el contrato
+`listNodes`/`listAlerts` es reusable apuntando a otra fuente).
 
 Lo que sí se quiere: que NetBot tenga **capacidad similar construida nativamente** (no
 consumiendo la API de ATLAS, no duplicando su código) —
