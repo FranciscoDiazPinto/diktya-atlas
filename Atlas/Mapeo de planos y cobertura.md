@@ -1,6 +1,6 @@
 ---
 tags: [atlas, netbot, planos, cobertura]
-updated: 2026-07-29
+updated: 2026-08-07
 ---
 
 # Mapeo de planos y cobertura
@@ -56,6 +56,16 @@ punto x,y del Pabellón 3 de Expomin 2026?" resuelve el evento y la zona por nom
 **Detección de stands por visión** → ver [[Detección de stands por vision]]. La idea: leer el
 plano con un LLM de visión para ubicar stands automáticamente (código + área del local, ej.
 "B-55"), con confirmación humana obligatoria antes de que sea consultable por chat.
+
+## Persistencia de los planos subidos (2026-08-07)
+
+Los archivos (`fileStorage.service.ts::savePlanFile`) quedan en disco local
+(`apps/backend/uploads/`, nombre generado por UUID, nunca el original), servidos vía
+`@fastify/static` en `/uploads/`. En `docker-compose.prod.yml` ese directorio ahora tiene volumen
+propio (`netbot_uploads_prod_data`, montado en el servicio `backend`) — antes de este fix no lo
+tenía, así que cualquier `docker compose up -d --build` en producción habría borrado todos los
+planos subidos (y dejado calibración/AP colocados apuntando a un archivo inexistente). Sin
+backup automatizado todavía — ver `DEPLOY.md` § 7.
 
 ## Ver también
 

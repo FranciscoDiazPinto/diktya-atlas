@@ -49,6 +49,8 @@ services:
   backend:
     <<: *backend-image
     command: ["node", "dist/server.js"]
+    volumes:
+      - netbot_uploads_prod_data:/app/apps/backend/uploads
 
   worker-monitor:
     <<: *backend-image
@@ -98,3 +100,4 @@ volumes:
   netbot_redis_prod_data:
   netbot_caddy_data:
   netbot_caddy_config:
+  netbot_uploads_prod_data:

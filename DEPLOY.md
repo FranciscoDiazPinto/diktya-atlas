@@ -117,7 +117,11 @@ de desarrollo **no se crean acá** — este flujo los reemplaza.
 ## 7. Backups (mínimo antes de operar cualquier evento real)
 
 `netbot_postgres_prod_data` es el volumen con todo el estado (usuarios,
-tickets, auditoría, reservas de VLAN). Definir un cron de
-`pg_dump`/`docker compose exec postgres pg_dump` a almacenamiento fuera de
-la misma máquina antes del milestone de seguridad — no cubierto por este
-runbook todavía, queda como pendiente explícito.
+tickets, auditoría, reservas de VLAN). `netbot_uploads_prod_data` (montado
+en `backend`, `/app/apps/backend/uploads`) tiene los planos subidos del
+módulo de mapeo/cobertura — sin backup, un evento borra el plano y con él
+la calibración y los AP colocados quedan huérfanos. Definir un cron de
+`pg_dump`/`docker compose exec postgres pg_dump` y una copia del volumen de
+uploads a almacenamiento fuera de la misma máquina antes del milestone de
+seguridad — no cubierto por este runbook todavía, queda como pendiente
+explícito.
