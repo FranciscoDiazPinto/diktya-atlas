@@ -80,9 +80,14 @@ const EnvSchema = z.object({
   AUTO_REMEDIATE_NOTIFY_THRESHOLD_MINUTES: z.coerce.number().int().positive().default(5),
 
   OPNSENSE_MODE: z.enum(["mock", "live"]).default("mock"),
-  OPNSENSE_HOST: z.string().optional(),
+  OPNSENSE_HOST: z.string().optional(), // ej. "10.71.111.101" (CORE-01)
   OPNSENSE_API_KEY: z.string().optional(),
   OPNSENSE_API_SECRET: z.string().optional(),
+  // Igual gotcha que UNIFI_OS_VERIFY_TLS: z.coerce.boolean() trata
+  // cualquier string no vacío (incluida la palabra "false") como true — la
+  // única forma real de que esto quede en false es no setear la variable.
+  // Default false a propósito: CORE-01 tiene certificado self-signed.
+  OPNSENSE_VERIFY_TLS: z.coerce.boolean().default(false),
 
   PROXMOX_HOST: z.string().optional(),
   PROXMOX_SVC_ACCOUNT: z.string().optional(),
@@ -134,6 +139,14 @@ function loadEnv() {
       throw new Error(
         `UNIFI_MODE=live con UNIFI_INTEGRATION_TRANSPORT=${parsed.data.UNIFI_INTEGRATION_TRANSPORT} requiere: ${missing.join(", ")}`
       );
+    }
+  }
+
+  if (parsed.data.OPNSENSE_MODE === "live") {
+    const requiredKeys = ["OPNSENSE_HOST", "OPNSENSE_API_KEY", "OPNSENSE_API_SECRET"] as const;
+    const missing = requiredKeys.filter((key) => !parsed.data[key]);
+    if (missing.length > 0) {
+      throw new Error(`OPNSENSE_MODE=live requiere: ${missing.join(", ")}`);
     }
   }
 

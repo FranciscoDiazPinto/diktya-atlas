@@ -9,7 +9,7 @@ import type { UnifiClient } from "../unifi/client.js";
  */
 export type OpnsenseClient = UnifiClient;
 
-function notImplemented(method: string): never {
+export function notImplemented(method: string): never {
   throw new Error(`OpnsenseClient.${method} no está implementado todavía (fase 2)`);
 }
 

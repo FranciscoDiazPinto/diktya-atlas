@@ -1,11 +1,12 @@
 import { env } from "../../config/env.js";
 import type { OpnsenseClient } from "./client.js";
-import { OpnsenseClientStub } from "./client.js";
 import { MockOpnsenseClient } from "./mockClient.js";
+import { createOpnsenseLiveClientFromEnv } from "./liveClient.js";
 
 export type { OpnsenseClient } from "./client.js";
 export { OpnsenseClientStub } from "./client.js";
 export { MockOpnsenseClient } from "./mockClient.js";
+export { OpnsenseLiveClient } from "./liveClient.js";
 
 let instance: OpnsenseClient | undefined;
 
@@ -45,8 +46,7 @@ function seedDemoData(client: MockOpnsenseClient): void {
 export function getOpnsenseClient(): OpnsenseClient {
   if (!instance) {
     if (env.OPNSENSE_MODE === "live") {
-      // Fase 2 — sin implementación real todavía (ver client.ts).
-      instance = new OpnsenseClientStub();
+      instance = createOpnsenseLiveClientFromEnv();
     } else {
       const mock = new MockOpnsenseClient();
       seedDemoData(mock);
