@@ -1,6 +1,6 @@
 ---
 tags: [atlas, netbot, opnsense, unifi, mobility]
-updated: 2026-08-03
+updated: 2026-08-07
 ---
 
 # OPNsense y UniFi (en el software)
@@ -66,10 +66,28 @@ propósito, nunca finge datos). Se agregó:
 
 **Decisión de alcance explícita** (2026-07-28): por ahora se construyó solo contra mock. Real
 OPNsense (CORE-01/CORE-02, HA) **es alcanzable hoy vía ZeroTier** con la API key de solo lectura
-que ya existe (`soporteFD`) — pendiente decisión de conectarlo de verdad. Real UniFi **sí es
+que ya existía (`soporteFD`) — pendiente decisión de conectarlo de verdad. Real UniFi **sí es
 alcanzable** desde el equipo de desarrollo — desactualizado desde 2026-07-29, ver
 [[Infraestructura Real]]/[[Rutas de Red]] para el detalle del camino (port-forward de facto en
 CORE-01, no la ruta WireGuard diseñada).
+
+**Bloqueado (2026-08-07): key `soporteFD` perdida, cuenta web de solo lectura.** Al retomar la
+conexión real de OPNsense (el "próximo paso" de arriba), el usuario encontró: (1) el secret de la
+API key `soporteFD` no está guardado en ningún lado accesible — ni en `apps/backend/.env` (que no
+tiene ninguna línea `OPNSENSE_*`, a diferencia de `UNIFI_API_KEY` que sí quedó en `.env`), ni en
+este vault, ni en memoria de Claude (por diseño, nunca se copian secretos acá — ver
+[[Infraestructura Real]] § "no tocar"). OPNsense solo muestra el secret una vez al crearlo, así
+que no es recuperable — hay que generar un par nuevo. (2) Al loguearse por navegador con su propio
+usuario, el rol es **solo lectura** — coherente con que `soporteFD` se creó deliberadamente así
+"solo para diagnóstico puntual, nunca para escribir", pero eso también le impide generar una key
+nueva por su cuenta. Necesita que alguien con más privilegio en CORE-01/CORE-02 le eleve el rol o
+genere la key — según la gobernanza documentada, ese es un llamado de **Lucas** (supervisa la
+infra real, ver [[Infraestructura Real]] § gobernanza), mismo patrón de bloqueo que
+[[WhatsApp y credenciales de invitados]].
+
+**Cómo aplicar al retomar**: preguntar primero si la conversación con Lucas sobre elevar el rol
+(o generar una key nueva con los permisos que haga falta para fase 2) ya se resolvió, antes de
+re-intentar conectar OPNsense real desde cero.
 
 ## Dashboard de disponibilidad (2026-07-31)
 

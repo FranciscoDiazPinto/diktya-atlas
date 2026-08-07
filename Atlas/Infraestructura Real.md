@@ -74,8 +74,11 @@ Operador de red para eventos móviles (expos, ferias). Activos **permanentes**:
   `writeWifiNetwork`/reboot contra el UDM real por primera vez, podría devolver 403 aunque el
   código esté bien.
 - **OPNsense real sí es alcanzable** desde este equipo vía ZeroTier (ping OK a `10.71.111.101`),
-  con una API key de solo lectura ya disponible — usada solo para diagnóstico puntual, nunca para
-  escribir.
+  pero la API key de solo lectura que existía (`soporteFD`) se perdió — su secret nunca quedó
+  guardado en `.env`/vault y OPNsense no lo vuelve a mostrar. La cuenta web del usuario también es
+  solo lectura, así que no puede generar una key nueva por su cuenta — **bloqueado (2026-08-07)**
+  esperando que Lucas eleve el rol o genere una key, ver [[OPNsense y UniFi]] § OPNsense para el
+  detalle.
 
 ## Ver también
 
