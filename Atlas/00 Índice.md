@@ -1,6 +1,6 @@
 ---
 tags: [atlas, indice]
-updated: 2026-08-06
+updated: 2026-08-10
 ---
 
 # Índice — bóveda Atlas
@@ -8,17 +8,25 @@ updated: 2026-08-06
 Mapa liviano de esta bóveda. Léase esta nota primero para decidir qué otra nota abrir — no hace
 falta leer todo el vault para tener contexto.
 
-## Software (NetBot)
+> **Rename 2026-08-10: el software pasó a llamarse ARGOS** (antes "NetBot") — decisión de Lucas +
+> el agente, formalizada en la entrega del 2026-08-10. Notas viejas todavía dicen "NetBot" en
+> varios lugares; el código del repo también. Ver [[ARGOS Arquitectura y Entrega 2026-08-10]]
+> primero si venís de una sesión anterior a esta fecha.
 
+## Software (ARGOS, antes "NetBot")
+
+- [[ARGOS Arquitectura y Entrega 2026-08-10]] — **empezar por acá**: el rename, la decisión de
+  arquitectura (consume ATLAS, nunca sondea equipos), la VM ya entregada, el contrato de API.
 - [[Proyecto Atlas]] — stack, arquitectura de seguridad, vistas del frontend, pendientes
   conocidos. Punto de entrada para todo lo del software.
 - [[LLM y tools]] — orquestador de chat, loop multi-paso, memoria conversacional, tools.
 - [[Mapeo de planos y cobertura]] — módulo de planos/AP/cobertura, modelo de datos, flujo.
-- [[OPNsense y UniFi]] — panel `/infra`, qué es mock y qué es real hoy.
+- [[OPNsense y UniFi]] — **superado**: describe sondeo directo a UniFi/OPNsense, arquitectura
+  descartada el 2026-08-10. Queda como historial técnico, no como camino a seguir.
 - [[Roles y permisos]] — matriz de roles, dónde se aplica el filtro, auth.
 - [[Detección de stands por vision]] — diseño futuro, no implementado (doc completo en el repo).
-- [[Despliegue a Producción]] — artefactos Docker Compose + Caddy + ZeroTier, decisiones acordadas,
-  validado en local, esperando la máquina dedicada del cliente.
+- [[Despliegue a Producción]] — la VM real ya existe (ver arriba); artefactos Docker Compose +
+  Caddy, pendiente adaptarlos a la VLAN 25 y a operar sin WAN.
 - [[WhatsApp y credenciales de invitados]] — **en pausa**, esperando definición con Lucas: soporte
   a clientes por WhatsApp + entrega de vouchers de red, bloqueado en una decisión de gobernanza de
   la API clásica de UniFi.
@@ -29,9 +37,9 @@ falta leer todo el vault para tener contexto.
   reglas de "no tocar", gobernanza, estado actual de bloqueos.
 - [[Rutas de Red]] — tabla completa de rutas (ZeroTier, WireGuard, OPNsense, Proxmox) y el camino
   de facto (no el diseñado) para llegar a UniFi real hoy.
-- [[Plataforma ATLAS (Codex)]] — sistema aparte, ya operativo, construido por Codex sobre la misma
-  infraestructura real. No confundir con NetBot — leer antes de asumir que algo de
-  observabilidad/alertas/auto-remediación ya está resuelto.
+- [[Plataforma ATLAS (Codex)]] — sistema que ARGOS consume (ya no "aparte" — ver decisión del
+  2026-08-10). Leer antes de asumir que algo de observabilidad/alertas/auto-remediación se
+  resuelve sondeando directo.
 
 ## Convención
 

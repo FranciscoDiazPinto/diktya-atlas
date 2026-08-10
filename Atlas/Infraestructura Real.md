@@ -1,13 +1,14 @@
 ---
 tags: [atlas, infraestructura, diktya]
-updated: 2026-08-07
+updated: 2026-08-10
 ---
 
 # Infraestructura real de Diktya Atlas
 
-Esto es la infraestructura física/operativa real que NetBot está pensado para operar como
-"agente de terreno" — separado del software (ver [[Proyecto Atlas]]). Fuente: documentación en
-`~/Descargas/DIKTYA ATLAS/` (no versionada en el repo, son datos operativos reales).
+Esto es la infraestructura física/operativa real que ARGOS (antes "NetBot") está pensado para
+operar como "agente de terreno" — separado del software (ver [[Proyecto Atlas]]). Fuente:
+entrega formal de Lucas, `~/Documentos/ENTREGA_FRANCISCO_2026-08-10/` (no versionada en el repo,
+son datos operativos reales — la ruta vieja `~/Descargas/DIKTYA ATLAS/` ya no existe).
 
 ## Qué es
 
@@ -25,31 +26,15 @@ Operador de red para eventos móviles (expos, ferias). Activos **permanentes**:
 | SMV-01 / SMV-02  | Proxmox                      | `10.71.111.201:8006` / `10.71.111.202:8006`                                                      | Independientes, **no clusterizados**                                                                                                                                                                                                                                                                                         |
 | MikroTik Chateau | Camino OOB de rescate vía 5G | `10.71.111.11`                                                                                   | **"No lo toques"** — un error ahí deja el sitio incomunicado y sin forma de arreglarlo a distancia                                                                                                                                                                                                                           |
 
-## VM de NetBot en Proxmox (decidido con Lucas, 2026-08-07)
+## VM de ARGOS en Proxmox — YA ENTREGADA (2026-08-07, reverificada 2026-08-10)
 
-NetBot deja de depender de "una máquina dedicada que el cliente va a proveer" (decisión anterior,
-ver [[Despliegue a Producción]] — **superada**) — corre en una VM dentro del Proxmox real.
-
-- **Ubicación confirmada por el usuario**: Proxmox (SMV-01/SMV-02) está físicamente dentro de
-  **RACK-A**. Como RACK-B no viaja a septiembre (decisión ya tomada) y RACK-A sí, la VM de NetBot
-  queda automáticamente del lado que va al evento — no importa cuál de los dos SMV específicos
-  use Lucas para crearla.
-- **Capacidad libre reportada por Lucas (2026-08-07)**: cada nodo (SMV-01/SMV-02) tiene 12
-  núcleos, ~20 GB RAM libre y 320+ GB de disco, sin ninguna VM corriendo todavía.
-- **VM, no LXC**: Docker Compose dentro de LXC exige nesting + keyctl, fricción evitable —
-  sería la primera VM del proyecto (todo lo demás, incluida la plataforma ATLAS de Codex, corre
-  en LXC).
-- **Red**: la VM va en la **VLAN de gestión** local (mismo rack que los cores), habla directo a
-  CORE-01/CORE-02 y a UniFi (`192.168.1.1`) por esa VLAN — no ZeroTier (ver [[Rutas de Red]] para
-  el razonamiento completo de por qué ZeroTier no tiene sentido para tráfico intra-rack).
-- **DNS interno: no existe todavía.** Lucas verificó que ni `atlas-mon-aa` ni
-  `core01.diktya.local` resuelven por ningún camino — si NetBot necesita un nombre interno (en
-  vez de o además del dominio público `netbot.diktya.cl` vía Cloudflare, ver
-  [[Despliegue a Producción]]), hay que crear la zona antes de poder emitir cualquier certificado
-  para él.
-- **Pendientes de Lucas, referenciados por ticket**: P-59 (endurecer regla de ZeroTier, antes de
-  septiembre — motivo por el que el bridge `10.71.111.101:8443` no es fiable a mediano plazo, ver
-  [[Rutas de Red]]), P-61 (ese mismo bridge nunca se replicó a CORE-02).
+Ya no es una decisión pendiente. VMID 240 (`argos`), en `DIKTYA-SMV-01` (RACK-A, confirmado que
+es el rack que viaja — coincide con lo que se había pedido), VLAN 25 `MGMT_SERVICIOS`,
+`10.100.25.240/24`, 4 vCPU/8 GB RAM/60 GB disco, Debian 12 + Docker 29.7.2 + Compose v5.4.0.
+Detalle completo, specs medidas y las reglas duras que se derivan de esta ubicación → **ver
+[[ARGOS Arquitectura y Entrega 2026-08-10]]**, la nota que reemplaza a esta sección como fuente de
+verdad. Lo que sigue acá es solo lo que no cambió: DNS interno (`argos.diktya.cl`) **sigue sin
+resolver**, y P-59/P-61 (abajo) siguen abiertos.
 
 ## Reglas de "no tocar" (gobernanza operativa)
 
@@ -66,11 +51,14 @@ ver [[Despliegue a Producción]] — **superada**) — corre en una VM dentro de
 
 ## Gobernanza del proyecto
 
-- Yo (Claude) opero de forma autónoma en desarrollo y documentación de **NetBot** (este repo).
+- Yo (Claude) opero de forma autónoma en desarrollo y documentación de **ARGOS** (este repo,
+  antes llamado "NetBot" — rename 2026-08-10). Según la hoja de entrada del 2026-08-10, el equipo
+  hoy son tres: Lucas (operador), yo (el agente) y Francisco — sin escalamiento ni guardia todavía.
 - "Codex" (GPT), supervisado por Lucas, no es solo auditor — construye y opera **ATLAS**, una
   plataforma separada (API + colector + Grafana + bot Telegram, ya en producción) sobre esta
-  misma infraestructura. Ver [[Plataforma ATLAS (Codex)]] — descubierto recién el 2026-07-30, no
-  relacionado con NetBot por decisión explícita.
+  misma infraestructura. Ver [[Plataforma ATLAS (Codex)]] — descubierta el 2026-07-30. **Ya no es
+  independiente de ARGOS**: desde el 2026-08-07/10, ARGOS consume su API en vez de sondear los
+  equipos directo (revierte la decisión original de independencia).
 - Eventos reales requieren un milestone de revisión de seguridad antes del "primer evento real".
 - La fase de pruebas corre hasta septiembre (2026).
 
@@ -99,16 +87,17 @@ ver [[Despliegue a Producción]] — **superada**) — corre en una VM dentro de
   UniFi o si fue creado explícitamente como solo-lectura — importa para cuando se pruebe
   `writeWifiNetwork`/reboot contra el UDM real por primera vez, podría devolver 403 aunque el
   código esté bien.
-- **OPNsense real sí es alcanzable** desde este equipo vía ZeroTier (ping OK a `10.71.111.101`),
-  pero la API key de solo lectura que existía (`soporteFD`) se perdió — su secret nunca quedó
-  guardado en `.env`/vault y OPNsense no lo vuelve a mostrar. La cuenta web del usuario también es
-  solo lectura, así que no puede generar una key nueva por su cuenta — **bloqueado (2026-08-07)**
-  esperando que Lucas eleve el rol o genere una key, ver [[OPNsense y UniFi]] § OPNsense para el
-  detalle.
+- **OPNsense real sí es alcanzable** desde este equipo vía ZeroTier. La key `soporteFD` perdida
+  (bloqueo del 2026-08-07) quedó resuelta ese mismo día: Lucas entregó un par key/secret nuevo por
+  core (`DIKTYA-CORE-01`/`DIKTYA-CORE-02`, grupo `admins`/`page-all`). **Pero desde el
+  2026-08-10 esto es historial, no un camino a seguir**: la arquitectura de ARGOS prohíbe sondear
+  OPNsense directo — esas keys quedan reservadas para una futura superficie de escritura
+  diseñada explícitamente, no para uso corriente. Ver
+  [[ARGOS Arquitectura y Entrega 2026-08-10]] y [[Plataforma ATLAS (Codex)]] § Decisión.
 
 ## Ver también
 
-- [[Proyecto Atlas]] — el software (NetBot) que opera sobre esta infraestructura
+- [[ARGOS Arquitectura y Entrega 2026-08-10]] — la VM real, el rename, y la arquitectura vigente
+- [[Proyecto Atlas]] — el software (ARGOS) que opera sobre esta infraestructura
 - [[Rutas de Red]] — tabla completa de rutas documentadas (ZeroTier, WireGuard, OPNsense, Proxmox)
-- [[Plataforma ATLAS (Codex)]] — otro software, de Codex, que también opera sobre esta misma
-  infraestructura — independiente de NetBot
+- [[Plataforma ATLAS (Codex)]] — la plataforma de Codex que ARGOS consume — ya no independiente

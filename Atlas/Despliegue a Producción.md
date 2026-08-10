@@ -1,26 +1,37 @@
 ---
-tags: [atlas, netbot, deploy, infraestructura]
-updated: 2026-08-07
+tags: [atlas, argos, deploy, infraestructura]
+updated: 2026-08-10
 ---
 
-# Despliegue a producción — NetBot
+# Despliegue a producción — ARGOS (antes "NetBot")
 
 Módulo de [[Proyecto Atlas]] — artefactos y runbook para llevar el software (no la infra real de
 eventos, ver [[Infraestructura Real]]) a un ambiente de producción de verdad. Detalle técnico
 completo vive en el repo (`DEPLOY.md`, `SECURITY.md` § Estrategia de despliegue) — esta nota es el
 resumen de decisiones y estado.
 
-## Decisiones acordadas con el usuario (2026-08-03, host superado 2026-08-07)
+## LA VM YA EXISTE — entregada 2026-08-07, reverificada 2026-08-10
 
-- **Host — CAMBIADO (2026-08-07)**: ya no es una máquina externa que el cliente provee (esa
-  decisión queda superada). Corre en una **VM dentro de Proxmox real** (SMV-01/SMV-02, dentro de
-  RACK-A — ver [[Infraestructura Real]] § VM de NetBot en Proxmox), que Lucas crea con su acceso
-  Administrator. El deploy sigue siendo Docker + Docker Compose (host-agnóstico en el software,
-  solo cambió dónde vive la VM).
-- **Acceso remoto del equipo**: se reusa **ZeroTier** (red `diktya-atlas-mgmt`,
-  `76fc96e498382f09`) — ya desplegado y en uso real hoy para llegar a OPNsense/UniFi (ver
-  [[Rutas de Red]]). Se descartó Tailscale, la recomendación original de `SECURITY.md`, para no
-  sumar una herramienta nueva sin necesidad.
+Ya no hay que provisionar nada de infraestructura — Lucas ya la creó. VMID 240 (`argos`), en
+`DIKTYA-SMV-01` (RACK-A), VLAN 25 `MGMT_SERVICIOS`, IP `10.100.25.240/24`, 4 vCPU/8 GB RAM/60 GB
+disco, Debian 12, Docker 29.7.2 + Compose v5.4.0, `/opt/argos` vacío y listo para el primer
+`docker compose up`. Detalle completo, incluidas las reglas duras que se derivan de esta
+ubicación (misma VLAN que ATLAS, opera sin WAN) → [[ARGOS Arquitectura y Entrega 2026-08-10]].
+**Esto reemplaza por completo la sección de "Host" de abajo, que queda como historial.**
+
+## Decisiones acordadas con el usuario (2026-08-03, host superado 2026-08-07, VM entregada 2026-08-07)
+
+- **Host — histórico**: originalmente "una máquina dedicada que el cliente va a proveer"
+  (2026-08-03), después "VM en Proxmox real, ubicación a definir con Lucas" (2026-08-07) — **hoy
+  ya no es una decisión pendiente**: la VM concreta existe y está arriba, ver sección de arriba.
+- **Acceso remoto del equipo — matizado 2026-08-10**: ZeroTier (red `diktya-atlas-mgmt`,
+  `76fc96e498382f09`) sigue siendo la vía de **desarrollo remoto** de Francisco hacia la VM
+  (`ssh -p 2240 argos@10.71.111.101`) — sigue vigente esa parte. Pero **no es ni debe ser** cómo
+  ARGOS opera: la VM vive en la VLAN 25 junto a ATLAS y no necesita el overlay para nada de su
+  funcionamiento — meter un cliente ZeroTier dentro de la VM está explícitamente prohibido (ver
+  [[ARGOS Arquitectura y Entrega 2026-08-10]]). Se descartó Tailscale, la recomendación original
+  de `SECURITY.md`, para no sumar una herramienta nueva sin necesidad — sigue siendo la elección
+  para el acceso de desarrollo, no para el producto.
 - **LLM en producción**: OpenRouter de pago (`anthropic/claude-sonnet-4.5`) como interino,
   mientras se define el hardware on-prem — ver [[LLM y tools]] / `project_local_llm` en memoria.
   No bloquea el deploy.
@@ -30,20 +41,25 @@ resumen de decisiones y estado.
 
 ## Topología
 
-Un solo hostname (ej. `netbot.diktya.cl`) detrás de un Caddy de borde: `/api/*` (prefijo
-sacado) → backend, resto → un segundo Caddy interno que sirve el build estático del frontend.
-Sin CORS en producción (mismo origen). Ningún servicio publica puerto salvo el Caddy de borde
-(80/443) — ni Postgres, ni Redis, ni backend/workers, ni el frontend.
+Hostname real ya decidido: **`argos.diktya.cl`** (no `netbot.diktya.cl`, nombre viejo). Detrás de
+un Caddy de borde: `/api/*` (prefijo sacado) → backend, resto → un segundo Caddy interno que
+sirve el build estático del frontend. Sin CORS en producción (mismo origen). **Único puerto
+publicado en la VM: 443** — ni Postgres, ni Redis, ni backend/workers, ni el frontend salen del
+Docker interno. El nombre se resuelve **en local** vía *host override* en el Unbound de los cores
+(`argos.diktya.cl → 10.100.25.240`) — pendiente de crear (ver
+[[ARGOS Arquitectura y Entrega 2026-08-10]]), no depende de DNS público para resolver en el
+recinto.
 
 TLS real vía **DNS-01 de Cloudflare** (dominio `diktya.cl`) — no requiere que la máquina sea
 alcanzable públicamente, solo control del DNS. Evita el warning de certificado autofirmado.
 
-**Objeción de Lucas (2026-08-07), sin resolver todavía**: esto mete una dependencia de internet
-(salir a Cloudflare) en una herramienta pensada para terreno — si el sitio del evento se queda
-sin salida a internet (ya pasó: Starlink/WAN_901 estuvo días sin IP, ver [[Infraestructura Real]]),
-la renovación del certificado no puede completarse. Alternativa no evaluada todavía: certificado
-interno (requiere la zona DNS interna que hoy no existe, ver § VM de NetBot en Proxmox en
-[[Infraestructura Real]]) o aceptar el warning de autofirmado para uso interno.
+**Objeción de Lucas (2026-08-07) — resuelta en la entrega del 2026-08-10**: la renovación del
+certificado sí depende de salir a Cloudflare, y eso no puede pasar en el recinto sin WAN. Resuelto
+por diseño, no descartando Cloudflare: **el certificado se emite/renueva desde la oficina** (hay
+WAN ahí), dura 90 días, y **Caddy nunca debe intentar emitir/renovar estando en el recinto** — si
+la renovación falla, sigue sirviendo con el certificado vigente en vez de negarse a arrancar. Es
+una de las cinco reglas duras de "opera sin WAN" — **hoy sin implementar** (Caddy no está
+levantado en la VM todavía).
 
 ## Artefactos (en el repo)
 
@@ -94,7 +110,8 @@ dispositivos).
 
 ## Ver también
 
-- `DEPLOY.md` (repo, raíz) — runbook completo paso a paso.
+- [[ARGOS Arquitectura y Entrega 2026-08-10]] — la VM real, sus specs, y las reglas duras de "opera sin WAN"
+- `DEPLOY.md` (repo, raíz) — runbook completo paso a paso (**desactualizado**: sigue describiendo el host viejo, hay que revisarlo contra la VM real antes de usarlo).
 - `SECURITY.md` (repo, raíz) — checklist de auditoría/secretos antes de producción.
 - [[Proyecto Atlas]] — el resto del software.
 - [[Infraestructura Real]] — el milestone de seguridad que gatea operar un evento real.

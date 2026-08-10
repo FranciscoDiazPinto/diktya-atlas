@@ -1,9 +1,17 @@
 ---
-tags: [atlas, netbot, opnsense, unifi, mobility]
-updated: 2026-08-07
+tags: [atlas, argos, opnsense, unifi, mobility, superado]
+updated: 2026-08-10
 ---
 
-# OPNsense y UniFi (en el software)
+# OPNsense y UniFi (en el software) — SUPERADO por la arquitectura del 2026-08-10
+
+> ⚠️ **Todo lo de abajo describe sondeo directo contra UniFi/OPNsense — arquitectura que la
+> entrega formal del 2026-08-10 prohíbe explícitamente.** Regla dura: *"ARGOS habla con ATLAS.
+> Nunca directo con OPNsense, UniFi, Proxmox o MikroTik."* Ver
+> [[ARGOS Arquitectura y Entrega 2026-08-10]] y [[Plataforma ATLAS (Codex)]] § Decisión. Se deja
+> esta nota completa como **historial técnico** (el trabajo de `liveClient.ts` no se pierde, el
+> contrato `listNodes`/`listAlerts` es reusable apuntando a la API de ATLAS) — no seguir
+> construyendo sobre este sondeo directo. El próximo cliente real consume las 21 rutas de ATLAS.
 
 Módulo de [[Proyecto Atlas]] — vista `/infra` (**solo Admin**, bloqueado a nivel de ruta en el
 frontend, no solo botón oculto). No confundir con la infraestructura real — ver
