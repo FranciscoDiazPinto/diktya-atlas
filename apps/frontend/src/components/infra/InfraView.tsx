@@ -37,7 +37,7 @@ function OpnsenseCard() {
       <CardHeader>
         <CardTitle>OPNsense</CardTitle>
         <CardDescription>
-          {data.online}/{data.totalNodos} nodos online · datos simulados (OPNSENSE_MODE=mock)
+          {data.online}/{data.totalNodos} nodos online · vía ATLAS
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">

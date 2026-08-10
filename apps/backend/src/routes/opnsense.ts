@@ -16,8 +16,8 @@ export async function opnsenseRoutes(fastify: FastifyInstance) {
     {
       preHandler: requireRole("ADMIN"),
       schema: routeDocs({
-        summary: "Estado OPNsense (nodos + alertas)",
-        description: "Lee en vivo del cliente en cada request (OPNSENSE_MODE=mock por defecto), no vía Postgres.",
+        summary: "Estado HA core (CORE-01/CORE-02) + alertas, vía ATLAS",
+        description: "Lee en vivo de la API de ATLAS en cada request (ATLAS_MODE=mock por defecto), no vía Postgres.",
         tags: ["Infraestructura"],
       }),
     },
