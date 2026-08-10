@@ -79,6 +79,14 @@ const EnvSchema = z.object({
   // solo queda el ticket INFO (auditoría), sin notificación.
   AUTO_REMEDIATE_NOTIFY_THRESHOLD_MINUTES: z.coerce.number().int().positive().default(5),
 
+  // API de ATLAS (Codex) — única fuente de estado de red para ARGOS desde el
+  // 2026-08-10 (regla dura de arquitectura: nunca sondear UniFi/OPNsense/
+  // Proxmox directo, ver Atlas/ARGOS Arquitectura y Entrega 2026-08-10.md).
+  // ATLAS_HOST ej. "10.100.25.245:8000" (VLAN 25, desde la VM de ARGOS) o
+  // "10.71.111.101:8000" (vía ZeroTier, desarrollo) — sin TLS, es HTTP plano.
+  ATLAS_MODE: z.enum(["mock", "live"]).default("mock"),
+  ATLAS_HOST: z.string().optional(),
+
   OPNSENSE_MODE: z.enum(["mock", "live"]).default("mock"),
   OPNSENSE_HOST: z.string().optional(), // ej. "10.71.111.101" (CORE-01)
   OPNSENSE_API_KEY: z.string().optional(),
@@ -140,6 +148,10 @@ function loadEnv() {
         `UNIFI_MODE=live con UNIFI_INTEGRATION_TRANSPORT=${parsed.data.UNIFI_INTEGRATION_TRANSPORT} requiere: ${missing.join(", ")}`
       );
     }
+  }
+
+  if (parsed.data.ATLAS_MODE === "live" && !parsed.data.ATLAS_HOST) {
+    throw new Error("ATLAS_MODE=live requiere ATLAS_HOST");
   }
 
   if (parsed.data.OPNSENSE_MODE === "live") {
