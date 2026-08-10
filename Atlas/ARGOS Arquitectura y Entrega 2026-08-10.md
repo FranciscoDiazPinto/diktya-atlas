@@ -146,6 +146,25 @@ Los 4 primeros checks del onboarding, corridos hoy — todos en verde:
 **Esto cierra el único pendiente que la entrega dejaba abierto para Francisco**: "SIN CONFIRMAR —
 tu IP no se vio en la tabla ARP de CORE-01". Avisar a Lucas que quedó confirmado.
 
+## Cliente de la API de ATLAS — construido y validado (2026-08-10, tarde)
+
+`apps/backend/src/integrations/atlas/` — tipos fieles al contrato (`types.ts`) y cliente HTTP
+(`client.ts`, `AtlasHttpClient`) para las 21 rutas, con `MockAtlasClient` para tests/dev
+(`ATLAS_MODE=mock|live` + `ATLAS_HOST` en env, mismo patrón que `UNIFI_MODE`/`OPNSENSE_MODE`).
+Cubre los gotchas del contrato directamente en el tipo/cliente: HA vía `ha_ok`/`carp.resumen` (no
+`carp_master`/`carp_backup`), timeouts por categoría (30 s `/energia`, 15 s `/status/proxmox`,
+10 s familia `/status`, 5 s el resto), `200` con `ok:false` tratado como dato — no como error — y
+un punto de inyección de cabeceras para cuando la API sume autenticación (P-40). Validado en vivo
+contra la API real por ZeroTier: HA sano, 7/7 UniFi, 48 redes, 23 clientes, coincide con el
+contrato.
+
+**No implementados a propósito**: `GET /panel` (HTML para humanos, no dato) y
+`POST /correo/prueba` (única escritura, no idempotente, el contrato dice explícito "no la llames
+desde código automático").
+
+**Siguiente paso, no hecho todavía**: este cliente no reemplaza aún a `opnsense.service.ts` /
+`network.service.ts` como fuente de datos de `/infra` y `/red` — sigue pendiente.
+
 ## Ver también
 
 - [[Plataforma ATLAS (Codex)]] — la plataforma que ARGOS consume, y la historia de la decisión de arquitectura
