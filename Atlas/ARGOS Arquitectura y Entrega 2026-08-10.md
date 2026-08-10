@@ -162,8 +162,29 @@ contrato.
 `POST /correo/prueba` (única escritura, no idempotente, el contrato dice explícito "no la llames
 desde código automático").
 
-**Siguiente paso, no hecho todavía**: este cliente no reemplaza aún a `opnsense.service.ts` /
-`network.service.ts` como fuente de datos de `/infra` y `/red` — sigue pendiente.
+## `worker-monitor` y `/opnsense/status` ya consumen ATLAS (2026-08-10, misma tarde)
+
+`worker-monitor.ts` sincroniza `NetworkNode` desde `/inventory` de ATLAS (antes: `listNodes()`
+directo a UniFi). `opnsense.service.ts` (backend de `GET /opnsense/status`) deriva CORE-01/CORE-02
+de `network.C1/C2.ok` y las alertas de `/alerts`, vía `integrations/atlas/normalize.ts`. Validado
+en vivo end-to-end: 7 equipos reales sincronizados con el tipo de dispositivo bien inferido, HA
+online en los dos cores, `curl /opnsense/status` responde 200 con datos reales.
+
+**Pérdida de fidelidad real y documentada** (no oculta, `/inventory` no da estos datos — confirmado
+contra el contrato §8.7): sin MAC/ID estable por equipo (`id` cae a `equipo.name`, renombrable —
+un rename en UniFi crea una fila nueva en vez de actualizar la existente), sin clientes conectados
+por equipo, sin SSIDs por AP. Al hacer el swap, la base de dev quedó con 7 filas duplicadas (las
+viejas por UUID de UniFi, ya no tocadas por nada) — limpiadas manualmente esa misma sesión.
+
+**Deliberadamente sin tocar todavía** — necesitan una decisión de diseño, no son un olvido:
+- `routes/network.ts`: `getLiveWifiNetworks` (panel de VLANs — ATLAS no expone el equivalente a
+  WiFi Broadcasts/VLAN de UniFi), `diagnoseNode`, `rebootNode` (escritura — ATLAS no tiene ninguna
+  ruta de escritura sobre equipos).
+- `autoRemediation.service.ts` / `workers/remediation.logic.ts`: mismo problema de escritura,
+  bloqueados hasta decidir "proponer vs. esperar a M5" (ver [[Plataforma ATLAS (Codex)]] § Decisión).
+
+`ATLAS_MODE=live` + `ATLAS_HOST=10.71.111.101:8000` (vía ZeroTier) ya en `apps/backend/.env` de
+este equipo — mismo criterio que `UNIFI_MODE=live`.
 
 ## Ver también
 
