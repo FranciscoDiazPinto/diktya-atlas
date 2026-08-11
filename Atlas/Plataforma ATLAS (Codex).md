@@ -96,6 +96,9 @@ duplicando el código de ATLAS, consumiendo sus datos) —
 ## Ver también
 
 - [[ARGOS Arquitectura y Entrega 2026-08-10]] — arquitectura vigente, VM ya provista, contrato de API
+- [[ATLAS — Rutas faltantes para ARGOS]] — lista concreta y auditada contra el código (2026-08-11)
+  de qué rutas le faltan a ATLAS para que los tres puntos de auto-remediación/VLAN/reboot de acá
+  arriba dejen de hablarle directo a UniFi
 - [[OPNsense y UniFi]] — implementación anterior de sondeo directo, superada por la arquitectura de arriba
 - [[Infraestructura Real]] — los componentes físicos reales, compartidos por ambos sistemas
 - [[Proyecto Atlas]] — pendientes conocidos de ARGOS

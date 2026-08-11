@@ -17,6 +17,9 @@ falta leer todo el vault para tener contexto.
 
 - [[ARGOS Arquitectura y Entrega 2026-08-10]] — **empezar por acá**: el rename, la decisión de
   arquitectura (consume ATLAS, nunca sondea equipos), la VM ya entregada, el contrato de API.
+- [[ATLAS — Rutas faltantes para ARGOS]] — lista concreta para Lucas: qué le falta a la API de
+  ATLAS (lecturas de detalle + todas las escrituras) para que ARGOS deje de hablarle directo a
+  UniFi. Decisión 2026-08-11: no se saltea la regla con workarounds, se documenta y se espera.
 - [[Proyecto Atlas]] — stack, arquitectura de seguridad, vistas del frontend, pendientes
   conocidos. Punto de entrada para todo lo del software.
 - [[LLM y tools]] — orquestador de chat, loop multi-paso, memoria conversacional, tools.
