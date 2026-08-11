@@ -14,11 +14,19 @@
 # NINGÚN servicio interno publica puerto — solo `caddy` expone 80/443.
 # Postgres/Redis/backend/workers/frontend solo son alcanzables entre sí por
 # la red interna de Docker.
+#
+# `pull_policy: never` en todos los servicios: ARGOS opera en el evento sin
+# WAN garantizada, así que ningún `docker compose up`/`--build` in situ
+# puede depender de alcanzar Docker Hub. La imagen (o el build local) tiene
+# que existir ya en el host desde la preparación en oficina — ver "Sin WAN
+# en el evento" en DEPLOY.md. Si falta, esto falla alto y claro en vez de
+# colgarse intentando resolver el registry.
 
 x-backend-image: &backend-image
   build:
     context: .
     dockerfile: apps/backend/Dockerfile
+  pull_policy: never
   env_file: .env.production
   depends_on:
     postgres:
@@ -30,6 +38,7 @@ x-backend-image: &backend-image
 services:
   postgres:
     image: postgres:16-alpine
+    pull_policy: never
     restart: unless-stopped
     env_file: .env.production
     volumes:
@@ -42,6 +51,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    pull_policy: never
     restart: unless-stopped
     volumes:
       - netbot_redis_prod_data:/data
@@ -76,6 +86,7 @@ services:
     build:
       context: .
       dockerfile: apps/frontend/Dockerfile
+    pull_policy: never
     restart: unless-stopped
 
   caddy:
@@ -83,6 +94,7 @@ services:
     build:
       context: deploy
       dockerfile: Dockerfile
+    pull_policy: never
     restart: unless-stopped
     ports:
       - "80:80"

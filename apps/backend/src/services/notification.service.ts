@@ -18,6 +18,9 @@ export interface NotificationChannel {
   send(message: NotificationMessage): Promise<void>;
 }
 
+/** Sitio opera sin WAN garantizada — un canal inalcanzable debe fallar visible (y quedar loggeado por notifyTechnicians) en vez de colgar el job que lo dispara. */
+const TIMEOUT_NOTIFY_MS = 8_000;
+
 export class TelegramChannel implements NotificationChannel {
   name = "telegram";
   constructor(private botToken: string, private chatId: string) {}
@@ -30,6 +33,7 @@ export class TelegramChannel implements NotificationChannel {
         chat_id: this.chatId,
         text: `[${message.severidad}] ${message.sitio ? `(${message.sitio}) ` : ""}${message.mensaje}`,
       }),
+      signal: AbortSignal.timeout(TIMEOUT_NOTIFY_MS),
     });
     if (!res.ok) throw new Error(`Telegram notify falló: ${res.status}`);
   }
@@ -46,6 +50,7 @@ export class SlackChannel implements NotificationChannel {
       body: JSON.stringify({
         text: `*[${message.severidad}]* ${message.sitio ? `(${message.sitio}) ` : ""}${message.mensaje}`,
       }),
+      signal: AbortSignal.timeout(TIMEOUT_NOTIFY_MS),
     });
     if (!res.ok) throw new Error(`Slack notify falló: ${res.status}`);
   }
@@ -60,6 +65,7 @@ export class WebhookChannel implements NotificationChannel {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(message),
+      signal: AbortSignal.timeout(TIMEOUT_NOTIFY_MS),
     });
     if (!res.ok) throw new Error(`Webhook notify falló: ${res.status}`);
   }

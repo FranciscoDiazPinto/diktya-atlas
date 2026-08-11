@@ -8,6 +8,13 @@ sigue bloqueado por el milestone de revisión de seguridad documentado en
 `Atlas/Infraestructura Real.md` — no confundir "deploy listo" con "listo
 para el primer evento real".
 
+**Requisito no negociable: ARGOS tiene que operar sin WAN en el venue del
+evento.** Los pasos 1-6 de este runbook se corren **en oficina**, con
+internet disponible (join a ZeroTier, `git clone`, `docker compose build`,
+emisión del certificado TLS vía DNS-01 de Cloudflare, etc.). Una vez hecho
+eso, la máquina viaja al evento y ahí **no puede depender de la WAN para
+nada** — ver §8 para el procedimiento de arranque/reinicio en el venue.
+
 ## 1. Prerrequisitos en la máquina dedicada
 
 - Linux con Docker + Compose v2 (el plugin `docker compose` o el binario
@@ -125,3 +132,49 @@ la calibración y los AP colocados quedan huérfanos. Definir un cron de
 uploads a almacenamiento fuera de la misma máquina antes del milestone de
 seguridad — no cubierto por este runbook todavía, queda como pendiente
 explícito.
+
+## 8. Sin WAN en el evento
+
+Los pasos 1-6 dejan la máquina con todo lo que necesita cacheado localmente
+para no depender nunca de la WAN en el venue:
+
+- **Imágenes/build**: `docker-compose.prod.yml` tiene `pull_policy: never`
+  en todos los servicios — nada intenta resolver un registry al arrancar.
+  Consecuencia directa: el `--build` del paso 5 **tiene que haberse corrido
+  ya en oficina**. Si hace falta reconstruir algo (cambió el código, se
+  actualizó una dependencia), eso se hace en oficina antes de viajar, nunca
+  en el venue.
+- **Certificado TLS**: se emite una sola vez, en oficina, la primera vez que
+  `caddy` arranca con `CF_API_TOKEN` configurado y puede alcanzar la API de
+  Cloudflare (DNS-01, no necesita que el servidor sea alcanzable
+  públicamente — solo que el servidor alcance internet saliente). Caddy lo
+  cachea en el volumen `netbot_caddy_data`; mientras ese volumen no se
+  borre, un restart en el venue sirve el certificado cacheado sin tocar la
+  red. Confirmar antes de viajar con `docker compose exec caddy caddy
+  list-certificates` (o revisando `/data/caddy/certificates` dentro del
+  volumen) que el certificado del dominio real está ahí y vigente.
+- **LLM (OpenRouter/Anthropic/OpenAI-compatible)**: cada request al
+  proveedor tiene un timeout explícito de 30s (`AbortSignal.timeout`, ver
+  `llm/providers/*.ts`) — si no hay WAN, el chat responde `502` con un
+  mensaje claro en vez de colgarse. El resto de la app (REST endpoints,
+  workers de red) no depende del LLM para funcionar.
+- **Notificaciones (Telegram/Slack/webhook genérico)**: mismo patrón, 8s de
+  timeout por canal (`services/notification.service.ts`) y
+  `Promise.allSettled` — un canal caído se loggea y no bloquea ni tumba el
+  worker que la disparó (p. ej. `worker-autoremediate`).
+- **Arranque de servicios**: ninguno de los `healthcheck`/`depends_on` en
+  `docker-compose.prod.yml` depende de algo externo — solo Postgres/Redis
+  (internos). `server.ts` no hace ninguna llamada de red al arrancar.
+
+**Procedimiento en el venue** (máquina ya preparada en oficina, sin `git
+clone` ni `--build`):
+
+```
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Nunca agregar `--build` acá. Si un servicio no levanta por imagen faltante,
+`pull_policy: never` lo va a decir explícito en el log (`pull access denied`
+o similar) en vez de colgarse intentando pulear — señal de que algo no se
+preparó bien en oficina, no algo para resolver in situ con internet que no
+va a estar.

@@ -1,6 +1,9 @@
 import type { LlmChatParams, LlmChatResult, LlmProvider } from "../provider.js";
 import { buildOpenAiStylePayload, parseOpenAiStyleResponse, type OpenAiStyleResponse } from "./openRouter.js";
 
+/** Sitio opera sin WAN garantizada — un host inalcanzable debe fallar visible en vez de colgar el turno de chat, ver routes/chat.ts. */
+const TIMEOUT_CHAT_MS = 30_000;
+
 export class OpenAiCompatibleProvider implements LlmProvider {
   constructor(
     private apiKey: string,
@@ -16,6 +19,7 @@ export class OpenAiCompatibleProvider implements LlmProvider {
         "content-type": "application/json",
       },
       body: JSON.stringify(buildOpenAiStylePayload(this.model, params)),
+      signal: AbortSignal.timeout(TIMEOUT_CHAT_MS),
     });
     if (!res.ok) {
       throw new Error(`Proveedor OpenAI-compatible error: ${res.status} ${await res.text()}`);

@@ -59,6 +59,9 @@ export function parseOpenAiStyleResponse(json: OpenAiStyleResponse): LlmChatResu
   };
 }
 
+/** Sitio opera sin WAN garantizada — un host inalcanzable debe fallar visible en vez de colgar el turno de chat, ver routes/chat.ts. */
+const TIMEOUT_CHAT_MS = 30_000;
+
 export class OpenRouterProvider implements LlmProvider {
   constructor(
     private apiKey: string,
@@ -73,6 +76,7 @@ export class OpenRouterProvider implements LlmProvider {
         "content-type": "application/json",
       },
       body: JSON.stringify(buildOpenAiStylePayload(this.model, params)),
+      signal: AbortSignal.timeout(TIMEOUT_CHAT_MS),
     });
     if (!res.ok) {
       throw new Error(`OpenRouter error: ${res.status} ${await res.text()}`);

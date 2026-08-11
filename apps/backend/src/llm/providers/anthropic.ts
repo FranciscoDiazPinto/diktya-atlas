@@ -33,6 +33,9 @@ function toAnthropicMessage(m: LlmMessage) {
   };
 }
 
+/** Sitio opera sin WAN garantizada — un host inalcanzable debe fallar visible en vez de colgar el turno de chat, ver routes/chat.ts. */
+const TIMEOUT_CHAT_MS = 30_000;
+
 export class AnthropicProvider implements LlmProvider {
   constructor(
     private apiKey: string,
@@ -68,6 +71,7 @@ export class AnthropicProvider implements LlmProvider {
               }))
             : undefined,
       }),
+      signal: AbortSignal.timeout(TIMEOUT_CHAT_MS),
     });
     if (!res.ok) {
       throw new Error(`Anthropic error: ${res.status} ${await res.text()}`);
