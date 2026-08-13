@@ -87,6 +87,9 @@ export interface UnifiOsWifiBroadcastOverview {
  */
 export type UnifiOsWifiBroadcastDetail = Record<string, unknown> & { id: string; name: string };
 
+/** Sin timeout, un host UniFi inalcanzable (consola caída, connector sin ruta) colgaría el caller indefinidamente — mismo criterio que atlas/client.ts y los providers LLM. */
+const TIMEOUT_UNIFI_OS_MS = 10_000;
+
 interface PagedResponse<T> {
   data: T[];
   offset: number;
@@ -166,6 +169,7 @@ export class UnifiOsClient {
       },
       body: init?.body ? JSON.stringify(init.body) : undefined,
       dispatcher: this.agent,
+      signal: AbortSignal.timeout(TIMEOUT_UNIFI_OS_MS),
     });
     if (!res.ok) {
       throw new Error(`UniFi OS API error en ${path}: ${res.status} ${res.statusText}`);
@@ -188,6 +192,7 @@ export class UnifiOsClient {
       },
       body: init?.body ? JSON.stringify(init.body) : undefined,
       dispatcher: this.agent,
+      signal: AbortSignal.timeout(TIMEOUT_UNIFI_OS_MS),
     });
     if (!res.ok) {
       throw new Error(`UniFi OS API error en ${path}: ${res.status} ${res.statusText}`);

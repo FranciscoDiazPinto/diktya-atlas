@@ -11,6 +11,9 @@ import type { RawUnifiAlarm } from "./normalize.js";
 import type { UnifiOsClient } from "../unifiOs/client.js";
 import { env } from "../../config/env.js";
 
+/** Sin timeout, un UDM inalcanzable colgaría el caller indefinidamente — mismo criterio que unifiOs/client.ts. Solo cubre la API clásica (login/request); la Integration API real ya tiene su propio timeout. */
+const TIMEOUT_UNIFI_CLASSIC_MS = 10_000;
+
 export interface UnifiLiveClientConfig {
   /**
    * Credenciales clásicas — opcionales a propósito. Usadas solo por
@@ -120,6 +123,7 @@ export class UnifiLiveClient implements UnifiClient {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ username: this.config.username, password: this.config.password }),
+      signal: AbortSignal.timeout(TIMEOUT_UNIFI_CLASSIC_MS),
     });
     if (!res.ok) {
       throw new Error(`UniFi login falló: ${res.status} ${res.statusText}`);
@@ -144,6 +148,7 @@ export class UnifiLiveClient implements UnifiClient {
           cookie: this.cookie ?? "",
           ...init?.headers,
         },
+        signal: AbortSignal.timeout(TIMEOUT_UNIFI_CLASSIC_MS),
       });
 
     let res = await doRequest();
