@@ -127,11 +127,32 @@ de desarrollo **no se crean acá** — este flujo los reemplaza.
 tickets, auditoría, reservas de VLAN). `netbot_uploads_prod_data` (montado
 en `backend`, `/app/apps/backend/uploads`) tiene los planos subidos del
 módulo de mapeo/cobertura — sin backup, un evento borra el plano y con él
-la calibración y los AP colocados quedan huérfanos. Definir un cron de
-`pg_dump`/`docker compose exec postgres pg_dump` y una copia del volumen de
-uploads a almacenamiento fuera de la misma máquina antes del milestone de
-seguridad — no cubierto por este runbook todavía, queda como pendiente
-explícito.
+la calibración y los AP colocados quedan huérfanos.
+
+`deploy/backup.sh` hace ambas cosas: `pg_dump` vía el contenedor `postgres`
+(gzip, credenciales leídas de `.env.production`) y un `tar` del volumen de
+uploads vía el contenedor `backend` (que ya lo tiene montado — evita
+depender del nombre real del volumen, que cambia según el project name de
+Compose). Escribe en `$BACKUP_DIR` (default `/opt/argos/backups`) con
+timestamp y rota lo más viejo que `$RETENTION_DAYS` días (default 14).
+`set -euo pipefail` asegura que un `pg_dump` fallido corte el script en vez
+de dejar un backup vacío con apariencia de éxito.
+
+Instalar el cron (ajustar el usuario/hora según el host real):
+
+```bash
+crontab -e
+# agregar:
+0 3 * * * cd /opt/argos && ./deploy/backup.sh >> /var/log/argos-backup.log 2>&1
+```
+
+**Todavía no cubierto, pendiente explícito**: la copia a almacenamiento
+*fuera* de esta misma máquina. Tal como está, un disco corrupto o un `rm -rf`
+del host se lleva backups y datos originales juntos — esto solo protege
+contra un volumen de Docker roto o un contenedor que se comió sus propios
+datos. Antes del milestone de seguridad, decidir destino remoto (otro host
+DIKTYA vía ZeroTier, un bucket S3-compatible, etc.) y agregar ese paso al
+script.
 
 ## 8. Sin WAN en el evento
 
