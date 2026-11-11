@@ -335,7 +335,18 @@ export interface VlanReserveResponse {
   results: VlanReserveItemResult[];
 }
 
+export type ChangeExecutionStatus = "APPROVED" | "QUEUED" | "EXECUTING" | "APPLIED" | "BLOCKED" | "FAILED" | "UNCERTAIN";
+export interface VlanPlanDetail {
+  plan: VlanPlan;
+  reservations: Array<{
+    id: string; sitio: string; redSolicitada: string; vlanId: number; estado: "RESERVADA" | "APLICADA" | "LIBERADA";
+    approvalId: string | null; executionStatus: ChangeExecutionStatus | null; approvedAt: string | null; approvalExpiresAt: string | null;
+  }>;
+}
 export interface VlanApplyResponse {
+  approvalId: string;
+  estado: ChangeExecutionStatus;
+
   encolado: boolean;
   jobId?: string;
   reservationId: string;
@@ -350,6 +361,8 @@ export interface ChatToolResult {
 }
 
 export interface ChatResponse {
+  conversationId: string;
+  version: number;
   mensaje: string;
   toolResults: ChatToolResult[];
 }

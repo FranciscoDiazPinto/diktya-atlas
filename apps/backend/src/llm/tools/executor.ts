@@ -12,7 +12,6 @@ import { getAvailability } from "../../services/nodeAvailability.service.js";
 import { listOpenIssues } from "../../services/openIssues.service.js";
 import { startOfToday } from "../../lib/dates.js";
 import { generateVlanPlan } from "../../services/planDiff.service.js";
-import { reserveVlanPlanItems, enqueueApplyVlanPlan } from "../../services/vlanFlow.service.js";
 import { createTicket, escalateTicket, assignTicket } from "../../services/ticket.service.js";
 import { notifyTechnicians } from "../../services/notification.service.js";
 import { getCoverageAtPoint, findCoverageGaps } from "../../services/coverage.service.js";
@@ -28,8 +27,8 @@ type ToolHandler = (args: never, ctx: RequestContext) => Promise<unknown>;
  * funciones predefinidas, y solo después de pasar el filtro de rol
  * (registry.ts) + esta segunda validación server-side (defensa en
  * profundidad — nunca confiar en que "el LLM decidió no hacerlo").
- * apply_vlan_plan encola en remediation-queue; ninguna de estas escribe
- * directo en UniFi/OPNsense.
+ * El modelo solo propone cambios de red. Reservar y aprobar son solicitudes
+ * HTTP explícitas del usuario; no existen herramientas para esas acciones.
  */
 const handlers: Record<ToolName, ToolHandler> = {
   get_network_status: (async (args: { sitio?: string }) => getNetworkStatusSummary(args.sitio)) as ToolHandler,
@@ -48,12 +47,8 @@ const handlers: Record<ToolName, ToolHandler> = {
       hasta: args.hasta ? new Date(args.hasta) : new Date(),
     })) as ToolHandler,
   list_open_issues: (async (args) => listOpenIssues(args as never)) as ToolHandler,
-  propose_vlan_plan: (async (args: { csvRows: never }) =>
-    generateVlanPlan(args.csvRows as never, getUnifiClient())) as ToolHandler,
-  reserve_vlan: (async (args: { planId: string }, ctx: RequestContext) =>
-    reserveVlanPlanItems(args.planId, ctx.userId)) as ToolHandler,
-  apply_vlan_plan: (async (args: { reservationId: string }) =>
-    enqueueApplyVlanPlan(args.reservationId)) as ToolHandler,
+  propose_vlan_plan: (async (args: { csvRows: never }, ctx: RequestContext) =>
+    generateVlanPlan(args.csvRows as never, getUnifiClient(), ctx)) as ToolHandler,
   create_ticket: (async (args) => createTicket(args as never)) as ToolHandler,
   escalate_ticket: (async (args: { ticketId: string; motivo: string }) =>
     escalateTicket(args.ticketId, args.motivo)) as ToolHandler,

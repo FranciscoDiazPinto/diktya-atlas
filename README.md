@@ -21,3 +21,5 @@ implementados. Monorepo (pnpm workspaces):
 Pendientes explícitos (documentados donde corresponde, no silenciados):
 gestión de usuarios/roles desde Admin, cliente OPNsense real, auth del
 WebSocket de tiempo real, y QR real para el enrolamiento de 2FA.
+
+Plan de evolución y estado de las entregas: [mejoras de Atlas](docs/atlas-improvement-plan.md).

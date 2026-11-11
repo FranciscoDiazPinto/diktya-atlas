@@ -36,6 +36,11 @@ export const VlanPlanSchema = z.object({
   id: z.string(),
   items: z.array(VlanPlanItemSchema),
   creadoEn: z.string().datetime(),
+  source: z.enum(["mock", "live"]),
+  targetFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  version: z.number().int().positive(),
+  fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  expiresAt: z.string().datetime(),
 });
 export type VlanPlan = z.infer<typeof VlanPlanSchema>;
 

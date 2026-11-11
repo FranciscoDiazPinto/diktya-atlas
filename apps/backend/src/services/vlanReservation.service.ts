@@ -9,11 +9,12 @@ export interface ReserveVlanInput {
   redSolicitada: string;
   reservadoPorId: string;
   plan: VlanPlan;
+  changePlanId?: string;
 }
 
 /**
  * Reservar es un INSERT con constraint de unicidad sobre (vlanId, sitio,
- * estado=RESERVADA) — ver @@unique([vlanId, sitio, estado]) en el schema.
+ * estado=RESERVADA), garantizado por el índice parcial SQL.
  * Si ya existe una reserva activa, Prisma lanza P2002 y la traducimos a
  * 409: NUNCA reintentamos silenciosamente sobre la reserva existente.
  */
@@ -25,6 +26,7 @@ export async function reserveVlan(input: ReserveVlanInput): Promise<PrismaVlanRe
         sitio: input.sitio,
         redSolicitada: input.redSolicitada,
         reservadoPorId: input.reservadoPorId,
+        changePlanId: input.changePlanId,
         planSnapshot: input.plan as unknown as Prisma.InputJsonValue,
         estado: "RESERVADA",
       },

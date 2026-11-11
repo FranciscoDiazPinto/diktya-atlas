@@ -26,10 +26,7 @@ export interface AutoRemediateJobData {
 
 export interface RemediationJobData {
   reservationId: string;
-  sitio: string;
-  vlanId: number;
-  ssid: string;
-  bandas: Array<"2.4GHz" | "5GHz" | "6GHz">;
+  approvalId: string;
 }
 
 export interface TicketFollowupJobData {

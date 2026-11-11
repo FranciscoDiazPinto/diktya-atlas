@@ -6,7 +6,7 @@ import { reserveVlan } from "../src/services/vlanReservation.service.js";
 import { ReservationConflictError } from "../src/lib/errors.js";
 
 function fakePlan(): VlanPlan {
-  return { id: randomUUID(), items: [], creadoEn: new Date().toISOString() };
+  return { id: randomUUID(), items: [], creadoEn: new Date().toISOString(), source: "mock", targetFingerprint: "b".repeat(64), version: 1, fingerprint: "a".repeat(64), expiresAt: new Date(Date.now() + 60000).toISOString() };
 }
 
 describe("vlanReservation.service", () => {

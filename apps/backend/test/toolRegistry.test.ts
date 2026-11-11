@@ -41,3 +41,14 @@ describe("llm/tools/registry — get_activity_digest, get_availability, list_ope
     expect(isToolAllowedForRole("VISUALIZADOR", "assign_ticket")).toBe(false);
   });
 });
+
+
+describe("confirmación humana de cambios de red", () => {
+  it("ningún rol ofrece herramientas para reservar o aplicar cambios al LLM", () => {
+    for (const role of ["ADMIN", "TECNICO", "VISUALIZADOR"] as const) {
+      expect(isToolAllowedForRole(role, "reserve_vlan")).toBe(false);
+      expect(isToolAllowedForRole(role, "apply_vlan_plan")).toBe(false);
+      expect(getToolsForRole(role).map((tool) => tool.name)).not.toContain("apply_vlan_plan");
+    }
+  });
+});

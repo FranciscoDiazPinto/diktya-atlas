@@ -99,10 +99,10 @@ de reuso, y las rutas de `/auth/*` con `app.inject()` end-to-end).
 
 1. `POST /csv/upload` (multipart, campo de archivo) → valida fila por fila
    → genera el plan de cambios (diff) contra UniFi. No escribe nada.
-2. `POST /vlan/reserve { planId }` → reserva cada ítem del plan (409 si
+2. `POST /vlan/reserve { planId, version, fingerprint }` → reserva cada ítem del plan (409 si
    alguno ya tiene una reserva activa en esa VLAN+sitio).
-3. Confirmación explícita del usuario (a implementar en el frontend).
-4. `POST /vlan/apply { reservationId }` → encola el trabajo real en
+3. Revisar cada fila y confirmar explícitamente en el diálogo del frontend.
+4. `POST /vlan/apply { reservationId, version, fingerprint, confirm: true }` → registra la aprobación y encola el trabajo real en
    `remediation-queue`; `worker-remediation` es el único que escribe de
    verdad, siempre bajo lock + verificación post-escritura + rollback.
 
@@ -111,3 +111,89 @@ de reuso, y las rutas de `/auth/*` con `app.inject()` end-to-end).
 Cliente OPNsense real, llamadas LLM en vivo sin API key configurada,
 auth del WebSocket (`GET /ws`), y UI de gestión de usuarios/roles — ver el
 detalle de cada uno en [`SECURITY.md`](../../SECURITY.md#pendientes-explícitos-fuera-de-alcance-de-esta-pasada).
+
+## Conversaciones privadas
+
+Aplicar las migraciones y generar el cliente Prisma antes de iniciar esta versión:
+`pnpm prisma:generate` y `pnpm prisma:migrate:deploy` desde `apps/backend`.
+La migración `20261110120000_private_conversations` agrega conversaciones y mensajes;
+no importa el historial antiguo del navegador porque no tiene propietario verificable.
+Desplegar frontend y backend juntos: el contrato de `POST /chat` cambió.
+
+- `POST /chat/conversations`: crea una conversación del usuario autenticado.
+- `GET /chat/conversations?offset=0&limit=30`: lista conversaciones propias, ordenadas por actividad.
+- `GET /chat/conversations/:id?limit=100&before=20`: recupera mensajes anteriores
+  a la secuencia indicada. `nextBefore=null` indica que no quedan páginas.
+- `DELETE /chat/conversations/:id`: elimina la conversación propia y sus mensajes.
+- `POST /chat { conversationId, version, message }`: usa exclusivamente el historial
+  del servidor y devuelve `{ conversationId, version, mensaje, toolResults }`.
+  Rechaza `history`, identidad y otros campos adicionales. La versión inicial es 0.
+
+Ni admin puede acceder a conversaciones ajenas. Se comprueba el rol actual en la
+base de datos y se impide continuar conversaciones creadas con otro rol. La pregunta
+y respuesta se guardan juntas; el historial no conserva resultados crudos de tools.
+La solicitud simultánea o con versión antigua devuelve 409 sin invocar el LLM.
+Un fallo del proveedor libera el turno sin guardar mensajes parciales.
+
+Si el proceso muere durante un turno, la marca `pending` se conserva para evitar
+repetir acciones automáticamente. El historial confirmado sigue disponible;
+crear una nueva conversación permite continuar. La reconciliación automática de
+turnos interrumpidos queda pendiente. Esta transacción protege los mensajes,
+no revierte acciones de herramientas: la separación de propuesta/aprobación es
+la siguiente etapa del [plan de mejoras](../../docs/atlas-improvement-plan.md).
+
+
+## Aprobación explícita de cambios de red
+
+Las propuestas se guardan en PostgreSQL (`network_change_plans`), no en Redis.
+Cada una es inmutable, pertenece a su creador y rol, tiene versión, huella de
+contenido y vencimiento de 30 minutos. Cambiar una propuesta requiere generar
+otra. Se vincula al modo mock/live y al controlador configurado mediante una
+huella sin credenciales; cambiar de entorno/controlador invalida su ejecución.
+El CSV acepta hasta 500 filas válidas y rechaza SSID/sitio duplicados.
+
+El LLM conserva `propose_vlan_plan`, pero ya no tiene `reserve_vlan` ni
+`apply_vlan_plan`. Las herramientas restantes de tickets/planos conservan su
+comportamiento; esta entrega separa específicamente las escrituras de red.
+
+- `GET /vlan/plans?offset=0&limit=20`: recuperar propuestas propias.
+- `GET /vlan/plans/:id`: propuesta y estados de sus reservas, sin ejecutar nada.
+- `POST /vlan/reserve { planId, version, fingerprint }`: reservar filas del plan
+  revisado; devolver las reservas existentes del mismo plan permite retomar la UI.
+- `POST /vlan/apply { reservationId, version, fingerprint, confirm: true }`:
+  aprobar únicamente esa fila. La aprobación registra actor, rol, huella, versión,
+  fecha y vencimiento (10 minutos o vencimiento del plan, lo que ocurra primero).
+- `POST /vlan/release { reservationId, version, fingerprint }`: liberar una reserva
+  propia pendiente/bloqueada o con rollback verificado. No revierte configuración;
+  rechaza reservas aplicadas, ejecutándose o inciertas. Permite liberar planes vencidos.
+
+El trabajo BullMQ solo lleva `reservationId` y `approvalId`. El worker reconstruye
+la configuración desde el plan aprobado, revalida identidad/rol, vigencia,
+instantánea y entorno después de las esperas externas y toma la aprobación con
+una actualización condicional antes de escribir. Se mantienen lock distribuido,
+comparación remota y verificación/rollback. La unicidad SQL ahora aplica solo a
+reservas activas, conservando múltiples aplicaciones/liberaciones históricas.
+
+Estados: `APPROVED` (encolado no confirmado), `QUEUED`, `EXECUTING`, `APPLIED`
+(escritura verificada), `BLOCKED`, `FAILED` (rollback verificado) y `UNCERTAIN`.
+Un fallo de cola conserva la aprobación y permite reintentar con el mismo jobId;
+no crea otra aprobación. Un fallo después de intentar escribir deja resultado
+incierto y no repite la escritura automáticamente. Si el proceso muere tras tomar
+la aprobación, `EXECUTING` se conserva; requiere conciliación técnica, no reset
+manual a `APPROVED`. Recuperación automática/outbox y conciliación completa quedan
+para la etapa 5. El resultado HTTP de encolado no acredita despliegue.
+
+### Actualización
+
+Detener servidor y workers anteriores, respaldar la base y aplicar migraciones
+con `pnpm prisma:migrate:deploy`; regenerar Prisma y desplegar frontend/backend/
+workers juntos. Las migraciones nuevas son `20261110130000_explicit_network_approval`
+y `20261110140000_active_vlan_reservation_index` (además de la de conversaciones).
+Los planes anteriores de Redis no se importan. Los trabajos antiguos sin aprobación
+válida se rechazan sin escribir; revisar las reservas anteriores antes de liberarlas
+manualmente. No convertir reservas antiguas en aprobaciones como parte de la migración.
+
+Las pruebas `networkApproval.routes.test.ts` usan PostgreSQL real de test, UniFi
+simulado y sustitutos de cola/lock/eventos. Cubren permisos, confirmación, alteración,
+vencimiento, concurrencia, reintento de cola, cambio de entorno, revalidación tras
+esperas, liberación e incertidumbre. No sustituyen laboratorio con controlador real.

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { describe, it, expect, afterAll } from "vitest";
 import { parseCsvRows } from "../src/services/csvIngestion.service.js";
 import { generateVlanPlan } from "../src/services/planDiff.service.js";
-import { reserveVlanPlanItems } from "../src/services/vlanFlow.service.js";
+import { reserveVlanPlanItems, enqueueApplyVlanPlan } from "../src/services/vlanFlow.service.js";
 import { processRemediation } from "../src/workers/remediation.logic.js";
 import { getUnifiClient } from "../src/integrations/unifi/index.js";
 import { prisma } from "../src/db/client.js";
@@ -18,10 +18,13 @@ describe("flujo e2e: CSV -> plan -> reserva -> aplicar", () => {
   const sitio = `sitio-e2e-${randomUUID()}`;
   const ssid = "SSID-E2E";
   const reservationIds: string[] = [];
+  const planIds: string[] = [];
+  const ctx = { userId: "dev-tecnico", role: "TECNICO" } as const;
 
   afterAll(async () => {
     await prisma.vlanReservation.deleteMany({ where: { id: { in: reservationIds } } });
     await prisma.ticket.deleteMany({ where: { vlanReservationId: { in: reservationIds } } });
+    await prisma.networkChangePlan.deleteMany({ where: { id: { in: planIds } } });
     await prisma.$disconnect();
   });
 
@@ -47,11 +50,12 @@ describe("flujo e2e: CSV -> plan -> reserva -> aplicar", () => {
     const client = getUnifiClient();
 
     // Estado inicial: no existe la red todavía -> el diff debe proponer "crear".
-    const plan = await generateVlanPlan(filas, client);
+    const plan = await generateVlanPlan(filas, client, ctx);
+    planIds.push(plan.id);
     expect(plan.items).toHaveLength(1);
     expect(plan.items[0]?.accion).toBe("crear");
 
-    const { results } = await reserveVlanPlanItems(plan.id, "dev-tecnico");
+    const { results } = await reserveVlanPlanItems(plan.id, ctx, plan);
     expect(results).toHaveLength(1);
     expect(results[0]?.ok).toBe(true);
     const reservationId = results[0]!.reservationId!;
@@ -63,13 +67,8 @@ describe("flujo e2e: CSV -> plan -> reserva -> aplicar", () => {
     // "Confirmación explícita del usuario" -> aplicar. Se invoca la lógica
     // de worker-remediation directamente (mismo código que corre el
     // worker real) para no depender del timing async de la cola.
-    await processRemediation({
-      reservationId,
-      sitio,
-      vlanId: 77,
-      ssid,
-      bandas: ["5GHz"],
-    });
+    const approval = await enqueueApplyVlanPlan(reservationId, ctx, plan);
+    await processRemediation({ reservationId, approvalId: approval.approvalId });
 
     const afterApply = await prisma.vlanReservation.findUniqueOrThrow({ where: { id: reservationId } });
     expect(afterApply.estado).toBe("APLICADA");
@@ -88,8 +87,9 @@ describe("flujo e2e: CSV -> plan -> reserva -> aplicar", () => {
 
     // Reintentar processRemediation sobre una reserva que ya no está
     // RESERVADA (ya está APLICADA) debe ser un no-op seguro.
+    const reservation = await prisma.vlanReservation.findUniqueOrThrow({ where: { id: reservationId } });
     await expect(
-      processRemediation({ reservationId: reservationId!, sitio, vlanId: 77, ssid, bandas: ["5GHz"] })
+      processRemediation({ reservationId: reservationId!, approvalId: reservation.approvalId! })
     ).resolves.toBeUndefined();
   });
 });

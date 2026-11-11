@@ -13,7 +13,7 @@ import { InfraView } from "./components/infra/InfraView.js";
 import { ChatProvider } from "./chat/ChatContext.js";
 
 function RequireAuth() {
-  const { status } = useAuth();
+  const { status, sessionEpoch } = useAuth();
   if (status === "loading") {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -22,7 +22,7 @@ function RequireAuth() {
     );
   }
   if (status === "unauthenticated") return <Navigate to="/login" replace />;
-  return <Outlet />;
+  return <Outlet key={sessionEpoch} />;
 }
 
 /** Bloquea la ruta por rol, no solo los botones dentro de ella — para vistas con contenido sensible (ej. infra core). */

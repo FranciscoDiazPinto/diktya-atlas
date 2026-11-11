@@ -37,7 +37,7 @@ export async function csvRoutes(fastify: FastifyInstance) {
       return reply.send({ filas, plan: null });
     }
 
-      const plan = await generateVlanPlan(filasValidas, getUnifiClient());
+      const plan = await generateVlanPlan(filasValidas, getUnifiClient(), request.authContext!);
       return reply.send({ filas, plan });
     }
   );

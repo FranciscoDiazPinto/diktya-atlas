@@ -60,3 +60,32 @@ describe("createApiClient — retry en 401", () => {
     expect(refreshAccessToken).not.toHaveBeenCalled();
   });
 });
+
+it("descarta respuestas de otra sesión y no renueva sus credenciales", async () => {
+  let current = true;
+  let resolve!: (response: Response) => void;
+  vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((r) => { resolve = r; })));
+  const refreshAccessToken = vi.fn(async () => "new-account-token");
+  const client = createApiClient({ accessToken: "old", refreshAccessToken, isSessionCurrent: () => current });
+  const pending = client.get("/tickets");
+  current = false;
+  resolve(new Response("{}", { status: 401 }));
+  await expect(pending).rejects.toThrow("La sesión cambió");
+  expect(refreshAccessToken).not.toHaveBeenCalled();
+  await expect(client.post("/chat", {})).rejects.toThrow("La sesión cambió");
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+it("descarta un cuerpo JSON que termina de leerse después del cambio de sesión", async () => {
+  let current = true;
+  let resolve!: (body: unknown) => void;
+  vi.stubGlobal("fetch", vi.fn(async () => ({
+    status: 200, ok: true, json: () => new Promise((r) => { resolve = r; }),
+  })));
+  const client = createApiClient({ accessToken: "old", refreshAccessToken: vi.fn(), isSessionCurrent: () => current });
+  const pending = client.get("/tickets");
+  await vi.waitFor(() => expect(resolve).toBeDefined());
+  current = false;
+  resolve({ private: "old account" });
+  await expect(pending).rejects.toThrow("La sesión cambió");
+});

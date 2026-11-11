@@ -2,6 +2,7 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localho
 
 export interface ApiClientOptions {
   accessToken: string | null;
+  isSessionCurrent?: () => boolean;
   /** Ver auth/AuthContext.tsx::performRefresh — deduplicado, dispara el timer proactivo de nuevo. */
   refreshAccessToken: () => Promise<string>;
 }
@@ -46,8 +47,17 @@ async function handleResponse<T>(res: Response): Promise<T> {
  * que el usuario cae al login en vez de quedar con la app congelada.
  */
 async function requestWithRefresh<T>(url: string, init: RequestInit, opts: ApiClientOptions): Promise<T> {
+  const assertCurrent = () => {
+    if (opts.isSessionCurrent && !opts.isSessionCurrent()) throw new ApiError(409, "La sesión cambió");
+  };
+  assertCurrent();
   const res = await fetch(url, init);
-  if (res.status !== 401) return handleResponse<T>(res);
+  assertCurrent();
+  if (res.status !== 401) {
+    const data = await handleResponse<T>(res);
+    assertCurrent();
+    return data;
+  }
 
   let freshToken: string;
   try {
@@ -56,10 +66,14 @@ async function requestWithRefresh<T>(url: string, init: RequestInit, opts: ApiCl
     return handleResponse<T>(res);
   }
 
+  assertCurrent();
   const retryHeaders = new Headers(init.headers);
   retryHeaders.set("authorization", `Bearer ${freshToken}`);
   const retryRes = await fetch(url, { ...init, headers: retryHeaders });
-  return handleResponse<T>(retryRes);
+  assertCurrent();
+  const data = await handleResponse<T>(retryRes);
+  assertCurrent();
+  return data;
 }
 
 /**

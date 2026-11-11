@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from "react";
+import { queryClient } from "../lib/queryClient.js";
 import * as authApi from "../lib/authApi.js";
 import type { PublicUser, Setup2faResponse } from "../types/api.js";
 
@@ -11,6 +12,8 @@ interface PendingTotp {
 }
 
 interface AuthContextValue {
+  sessionEpoch: number;
+  isSessionCurrent: () => boolean;
   status: AuthStatus;
   user: PublicUser | null;
   accessToken: string | null;
@@ -42,6 +45,18 @@ const PROACTIVE_REFRESH_INTERVAL_MS = 14 * 60 * 1000;
  * el login.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const epochRef = useRef(0);
+  const identityRef = useRef<string | null>(null);
+  const [sessionEpoch, setSessionEpoch] = useState(0);
+  const invalidateSession = useCallback(() => {
+    epochRef.current += 1;
+    identityRef.current = null;
+    setSessionEpoch(epochRef.current);
+    refreshInFlightRef.current = null;
+    queryClient.clear();
+    try { localStorage.removeItem("atlas-chat-messages"); } catch { /* Almacenamiento bloqueado. */ }
+  }, []);
+  const isSessionCurrent = useCallback(() => epochRef.current === sessionEpoch, [sessionEpoch]);
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<PublicUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -77,9 +92,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const performRefresh = useCallback((): Promise<string> => {
     if (refreshInFlightRef.current) return refreshInFlightRef.current;
 
+    const epoch = epochRef.current;
     const p = authApi
       .refresh()
       .then((data) => {
+        if (epochRef.current !== epoch) throw new Error("La sesión cambió");
+        const identity = `${data.user.id}:${data.user.role}`;
+        if (identityRef.current !== null && identityRef.current !== identity) invalidateSession();
+        identityRef.current = identity;
         setAccessToken(data.accessToken);
         setUser(data.user);
         setStatus("authenticated");
@@ -87,6 +107,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return data.accessToken;
       })
       .catch((err) => {
+        if (epochRef.current !== epoch) throw err;
+        invalidateSession();
         clearProactiveRefresh();
         setAccessToken(null);
         setUser(null);
@@ -94,12 +116,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw err;
       })
       .finally(() => {
-        refreshInFlightRef.current = null;
+        if (epochRef.current === epoch) refreshInFlightRef.current = null;
       });
 
     refreshInFlightRef.current = p;
     return p;
-  }, [scheduleProactiveRefresh, clearProactiveRefresh]);
+  }, [scheduleProactiveRefresh, clearProactiveRefresh, invalidateSession]);
 
   useEffect(() => {
     performRefresh().catch(() => {});
@@ -108,9 +130,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
+      invalidateSession();
+      clearProactiveRefresh();
+      setAccessToken(null);
+      setUser(null);
+      setStatus("unauthenticated");
+      setPendingTotp(null);
+      setTotpSetup(null);
+      const epoch = epochRef.current;
       const data = await authApi.login(email, password);
+      if (epochRef.current !== epoch) throw new Error("La sesión cambió");
 
       if (data.status === "ok") {
+        identityRef.current = `${data.user.id}:${data.user.role}`;
         setAccessToken(data.accessToken);
         setUser(data.user);
         setStatus("authenticated");
@@ -123,6 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.status === "2fa_setup_required") {
         setPendingTotp({ kind: "setup", token: data.setupToken });
         const setup = await authApi.setup2fa(data.setupToken);
+        if (epochRef.current !== epoch) throw new Error("La sesión cambió");
         setTotpSetup(setup);
         return;
       }
@@ -131,17 +164,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setPendingTotp({ kind: "login", token: data.loginToken });
       setTotpSetup(null);
     },
-    [scheduleProactiveRefresh]
+    [scheduleProactiveRefresh, clearProactiveRefresh, invalidateSession]
   );
 
   const submitTotpCode = useCallback(
     async (code: string) => {
       if (!pendingTotp) throw new Error("No hay un login con 2FA pendiente");
+      const epoch = epochRef.current;
       const data =
         pendingTotp.kind === "setup"
           ? await authApi.confirm2fa(pendingTotp.token, code)
           : await authApi.verifyLoginTotp(pendingTotp.token, code);
 
+      if (epochRef.current !== epoch) throw new Error("La sesión cambió");
+      identityRef.current = `${data.user.id}:${data.user.role}`;
       setAccessToken(data.accessToken);
       setUser(data.user);
       setStatus("authenticated");
@@ -153,18 +189,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    await authApi.logout().catch(() => {});
+    invalidateSession();
     clearProactiveRefresh();
     setAccessToken(null);
     setUser(null);
     setPendingTotp(null);
     setTotpSetup(null);
     setStatus("unauthenticated");
-  }, [clearProactiveRefresh]);
+    await authApi.logout().catch(() => {});
+  }, [clearProactiveRefresh, invalidateSession]);
 
   return (
     <AuthContext.Provider
       value={{
+        sessionEpoch,
+        isSessionCurrent,
         status,
         user,
         accessToken,

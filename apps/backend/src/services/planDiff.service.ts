@@ -1,58 +1,99 @@
-import { randomUUID } from "node:crypto";
-import type { CsvRow, VlanPlan, VlanPlanItem } from "@diktya-atlas/shared";
+import { createHash, randomUUID } from "node:crypto";
+import { CsvRowSchema, VlanPlanSchema, type CsvRow, type VlanPlan, type VlanPlanItem } from "@diktya-atlas/shared";
+import { Prisma } from "@prisma/client";
 import type { UnifiClient } from "../integrations/unifi/client.js";
-import { redis } from "../db/redis.js";
-import { NotFoundError } from "../lib/errors.js";
+import type { RequestContext } from "../auth/context.js";
+import { env } from "../config/env.js";
+import { prisma } from "../db/client.js";
+import { HttpError, NotFoundError } from "../lib/errors.js";
 
-const PLAN_TTL_SECONDS = 30 * 60;
+export const PLAN_TTL_MS = 30 * 60_000;
+export const APPROVAL_TTL_MS = 10 * 60_000;
 
-function planKey(planId: string): string {
-  return `plan:${planId}`;
+export async function authorizeNetworkChange(ctx: RequestContext) {
+  const user = await prisma.user.findUnique({ where: { id: ctx.userId } });
+  if (!user || user.role !== ctx.role || !["ADMIN", "TECNICO"].includes(user.role)) {
+    throw new HttpError(403, "Tu cuenta no está autorizada para cambios de red. Inicia sesión nuevamente.");
+  }
 }
 
-function bandasFromCsvBanda(banda: CsvRow["banda"]): Array<"2.4GHz" | "5GHz" | "6GHz"> {
-  if (banda === "ambas") return ["2.4GHz", "5GHz"];
-  return [banda];
+// JSONB puede cambiar el orden de las claves: el hash usa una representación canónica.
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    return `{${Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+export function planFingerprint(plan: Omit<VlanPlan, "fingerprint">): string {
+  const { id, version, items, creadoEn, expiresAt, source, targetFingerprint } = plan;
+  return createHash("sha256").update(canonical({ id, version, items, creadoEn, expiresAt, source, targetFingerprint })).digest("hex");
 }
 
-/**
- * Compara cada fila del CSV contra el estado actual (vía UnifiClient) y
- * arma el diff. NO escribe nada — eso solo pasa en apply_vlan_plan,
- * después de reservar y de la confirmación explícita del usuario.
- */
-export async function generateVlanPlan(rows: CsvRow[], unifiClient: UnifiClient): Promise<VlanPlan> {
+export function validateStoredPlan(record: { id: string; version: number; fingerprint: string; payload: unknown; expiresAt: Date }): VlanPlan {
+  const parsed = VlanPlanSchema.safeParse(record.payload);
+  if (!parsed.success) throw new HttpError(409, "La propuesta guardada no es válida. Genera otro plan.");
+  const plan = parsed.data;
+  if (plan.id !== record.id || plan.version !== record.version || plan.fingerprint !== record.fingerprint ||
+      new Date(plan.expiresAt).getTime() !== record.expiresAt.getTime() || planFingerprint(plan) !== record.fingerprint) {
+    throw new HttpError(409, "La propuesta cambió. Genera y revisa otro plan.");
+  }
+  return plan;
+}
+export function currentTargetFingerprint(): string {
+  return createHash("sha256").update(canonical({ mode: env.UNIFI_MODE, host: env.UNIFI_HOST ?? "", port: env.UNIFI_PORT ?? null,
+    site: env.UNIFI_SITE, integrationHost: env.UNIFI_OS_HOST ?? "", transport: env.UNIFI_INTEGRATION_TRANSPORT,
+    connectorHost: env.UNIFI_SITE_MANAGER_HOST_ID ?? "" })).digest("hex");
+}
+export function requireCurrentPlan(plan: VlanPlan, expected: { version: number; fingerprint: string }) {
+  if (plan.source !== env.UNIFI_MODE || plan.targetFingerprint !== currentTargetFingerprint()) throw new HttpError(409, "Cambió el entorno o controlador del plan. Genera otra propuesta.");
+  if (plan.version !== expected.version || plan.fingerprint !== expected.fingerprint) throw new HttpError(409, "El plan no coincide con la versión revisada.");
+  if (new Date(plan.expiresAt).getTime() <= Date.now()) throw new HttpError(409, "El plan venció. Genera y revisa otro plan.");
+}
+
+export function bandasFromCsvBanda(banda: CsvRow["banda"]): Array<"2.4GHz" | "5GHz" | "6GHz"> {
+  return banda === "ambas" ? ["2.4GHz", "5GHz"] : [banda];
+}
+
+/** Propone y persiste; no reserva ni escribe infraestructura. */
+export async function generateVlanPlan(rows: CsvRow[], client: UnifiClient, ctx: RequestContext): Promise<VlanPlan> {
+  await authorizeNetworkChange(ctx);
+  const validatedRows = CsvRowSchema.array().min(1).max(500).parse(rows);
   const items: VlanPlanItem[] = [];
-
-  for (const row of rows) {
-    const actual = await unifiClient.getWifiNetwork(row.sitio, row.ssid);
-    const accion: VlanPlanItem["accion"] = !actual
-      ? "crear"
-      : actual.vlanId === row.vlan_id
-        ? "sin_cambios"
-        : "modificar";
-
+  const resources = new Set<string>();
+  for (const row of validatedRows) {
+    const resource = JSON.stringify([row.sitio, row.ssid]);
+    if (resources.has(resource)) throw new HttpError(400, "El CSV contiene más de una propuesta para el mismo SSID y sitio.");
+    resources.add(resource);
+    const actual = await client.getWifiNetwork(row.sitio, row.ssid);
     items.push({
       sitio: row.sitio,
       redActual: actual ? { ssid: actual.ssid, vlanId: actual.vlanId } : null,
       redPropuesta: { ssid: row.ssid, vlanId: row.vlan_id, banda: row.banda },
-      accion,
+      accion: !actual ? "crear" : actual.vlanId === row.vlan_id ? "sin_cambios" : "modificar",
     });
   }
-
-  const plan: VlanPlan = {
-    id: randomUUID(),
-    items,
-    creadoEn: new Date().toISOString(),
-  };
-
-  await redis.set(planKey(plan.id), JSON.stringify(plan), "EX", PLAN_TTL_SECONDS);
+  await authorizeNetworkChange(ctx);
+  const now = new Date();
+  const proposal = { id: randomUUID(), version: 1, source: env.UNIFI_MODE, targetFingerprint: currentTargetFingerprint(), items, creadoEn: now.toISOString(), expiresAt: new Date(now.getTime() + PLAN_TTL_MS).toISOString() };
+  const plan: VlanPlan = { ...proposal, fingerprint: planFingerprint(proposal) };
+  await prisma.$transaction(async (tx) => {
+    const user = await tx.user.findUnique({ where: { id: ctx.userId } });
+    if (!user || user.role !== ctx.role) throw new HttpError(403, "Tu acceso cambió durante la consulta.");
+    await tx.networkChangePlan.create({ data: {
+      id: plan.id, ownerId: ctx.userId, ownerRole: ctx.role, version: plan.version,
+      fingerprint: plan.fingerprint, payload: plan as unknown as Prisma.InputJsonValue,
+      expiresAt: new Date(plan.expiresAt), createdAt: now,
+    } });
+    await tx.auditLog.create({ data: { actorId: ctx.userId, workerName: "network-change", toolName: "propose_vlan_plan",
+      parametros: { planId: plan.id, version: plan.version, fingerprint: plan.fingerprint }, resultado: { items: items.length }, exitoso: true } });
+  });
   return plan;
 }
 
-export async function getPlan(planId: string): Promise<VlanPlan> {
-  const raw = await redis.get(planKey(planId));
-  if (!raw) throw new NotFoundError(`plan ${planId} (puede haber expirado, TTL 30min)`);
-  return JSON.parse(raw) as VlanPlan;
+export async function getPlan(planId: string, ctx: RequestContext): Promise<VlanPlan> {
+  await authorizeNetworkChange(ctx);
+  const record = await prisma.networkChangePlan.findFirst({ where: { id: planId, ownerId: ctx.userId, ownerRole: ctx.role } });
+  if (!record) throw new NotFoundError("plan de cambios");
+  return validateStoredPlan(record);
 }
-
-export { bandasFromCsvBanda };

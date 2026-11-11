@@ -7,7 +7,8 @@ export function useApplyVlan() {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (reservationId: string) => api.post<VlanApplyResponse>("/vlan/apply", { reservationId }),
+    mutationFn: (input: { reservationId: string; version: number; fingerprint: string; confirm: true }) =>
+      api.post<VlanApplyResponse>("/vlan/apply", input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tickets"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.networkStatus() });

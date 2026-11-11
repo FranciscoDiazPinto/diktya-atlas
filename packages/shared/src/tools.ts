@@ -33,14 +33,6 @@ export const ProposeVlanPlanInputSchema = z.object({
   csvRows: z.array(CsvRowSchema),
 });
 
-export const ReserveVlanInputSchema = z.object({
-  planId: z.string(),
-});
-
-export const ApplyVlanPlanInputSchema = z.object({
-  reservationId: z.string(),
-});
-
 export const CreateTicketInputSchema = z.object({
   titulo: z.string(),
   descripcion: z.string(),
@@ -121,8 +113,6 @@ export const toolSchemas = {
   get_availability: GetAvailabilityInputSchema,
   list_open_issues: ListOpenIssuesInputSchema,
   propose_vlan_plan: ProposeVlanPlanInputSchema,
-  reserve_vlan: ReserveVlanInputSchema,
-  apply_vlan_plan: ApplyVlanPlanInputSchema,
   create_ticket: CreateTicketInputSchema,
   escalate_ticket: EscalateTicketInputSchema,
   assign_ticket: AssignTicketInputSchema,
@@ -151,8 +141,6 @@ export const toolsByRole: Record<z.infer<typeof RoleSchema>, ToolName[]> = {
     "get_availability",
     "list_open_issues",
     "propose_vlan_plan",
-    "reserve_vlan",
-    "apply_vlan_plan",
     "create_ticket",
     "escalate_ticket",
     "assign_ticket",
@@ -171,8 +159,6 @@ export const toolsByRole: Record<z.infer<typeof RoleSchema>, ToolName[]> = {
     "get_activity_digest",
     "list_open_issues",
     "propose_vlan_plan",
-    "reserve_vlan",
-    "apply_vlan_plan",
     "create_ticket",
     "assign_ticket",
     "notify_technicians",

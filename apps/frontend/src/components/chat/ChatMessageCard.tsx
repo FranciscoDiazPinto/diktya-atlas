@@ -8,7 +8,7 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   toolResults?: ChatToolResult[];
-  /** Error de red/cliente mostrado como si fuera respuesta del asistente — se excluye del historial que se reenvía al LLM. */
+  /** Error de red/cliente mostrado como si fuera respuesta del asistente — no se persiste en el historial del servidor. */
   isError?: boolean;
 }
 

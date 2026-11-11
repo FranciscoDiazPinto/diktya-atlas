@@ -143,3 +143,20 @@ punto de esta lista (plantilla + runbook), esto queda como el resumen.
   VPN del equipo, hay que resolver auth de WS (los navegadores no pueden
   mandar headers custom en el handshake — la vía típica es un token de
   corta vida por query param, validado y descartado al conectar).
+
+
+## Aprobación de cambios de red (implementación local · 10-11-2026)
+
+`reserve_vlan` y `apply_vlan_plan` ya no son herramientas del LLM. El backend
+exige una propuesta propia inmutable y una confirmación HTTP por fila con versión,
+huella y `confirm: true`. Se valida el rol actual desde la base y la vigencia antes
+de aprobar y ejecutar, también después de lecturas remotas. Ni admin puede aprobar
+planes de otra cuenta en esta etapa. Aprobaciones y aplicaciones verificadas quedan
+auditadas con actor, plan y huella, sin credenciales.
+
+El worker ignora configuración suministrada en la cola: solo acepta referencias a
+reservas y aprobaciones persistidas. Una marca de ejecución tomada o un resultado
+incierto no se reinicia automáticamente. Cambiar entorno/controlador invalida los
+planes anteriores. La liberación no permite ocultar trabajos ejecutándose o inciertos.
+Ver [contratos y actualización](apps/backend/README.md#aprobación-explícita-de-cambios-de-red).
+Los permisos por recurso y la autenticación WebSocket siguen pendientes.

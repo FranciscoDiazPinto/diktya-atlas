@@ -3,6 +3,6 @@ import { useAuth } from "../auth/AuthContext.js";
 import { createApiClient } from "../lib/apiClient.js";
 
 export function useApiClient() {
-  const { accessToken, refreshAccessToken } = useAuth();
-  return useMemo(() => createApiClient({ accessToken, refreshAccessToken }), [accessToken, refreshAccessToken]);
+  const { accessToken, refreshAccessToken, isSessionCurrent } = useAuth();
+  return useMemo(() => createApiClient({ accessToken, refreshAccessToken, isSessionCurrent }), [accessToken, refreshAccessToken, isSessionCurrent]);
 }

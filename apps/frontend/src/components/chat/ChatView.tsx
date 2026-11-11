@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Send, Trash2 } from "lucide-react";
-import type { VlanPlan } from "@diktya-atlas/shared";
+import { VlanPlanSchema, type VlanPlan } from "@diktya-atlas/shared";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useApiClient } from "../../hooks/useApiClient.js";
 import { useAuth } from "../../auth/AuthContext.js";
 import { useChat } from "../../hooks/useChat.js";
 import { useChatMessages } from "../../chat/ChatContext.js";
@@ -12,10 +14,13 @@ import { Button } from "../ui/Button.js";
 import type { CsvUploadResponse } from "../../types/api.js";
 
 export function ChatView() {
-  const { user } = useAuth();
+  const { user, isSessionCurrent } = useAuth();
   const role = user!.role;
   const chat = useChat();
-  const { messages, addMessage, clearMessages } = useChatMessages();
+  const api = useApiClient();
+  const cache = useQueryClient();
+  const savedPlans = useQuery({ queryKey: ["vlan-plans"], queryFn: () => api.get<VlanPlan[]>("/vlan/plans"), enabled: role !== "VISUALIZADOR" });
+  const { messages, addMessage, clearMessages, conversations, conversation, loading, error, selectConversation, newConversation, loadOlder, completeTurn } = useChatMessages();
   const [input, setInput] = useState("");
   const [csvResult, setCsvResult] = useState<CsvUploadResponse | null>(null);
   const [plan, setPlan] = useState<VlanPlan | null>(null);
@@ -32,24 +37,27 @@ export function ChatView() {
   function handleCsvResult(result: CsvUploadResponse) {
     setCsvResult(result);
     setPlan(result.plan);
+    void cache.invalidateQueries({ queryKey: ["vlan-plans"] });
   }
 
   function handleSend() {
     const text = input.trim();
     if (!text) return;
 
-    const history = messages
-      .filter((m) => !m.isError)
-      .slice(-20)
-      .map((m) => ({ role: m.role, content: m.content }));
+    if (!conversation || loading || chat.isPending || conversation.pending) return;
 
     addMessage({ id: crypto.randomUUID(), role: "user", content: text });
     setInput("");
 
     chat.mutate(
-      { message: text, history },
+      { message: text, conversationId: conversation.id, version: conversation.version },
       {
         onSuccess: (data) => {
+          if (!isSessionCurrent()) return;
+          completeTurn(data.version);
+          const proposal = data.toolResults.find((result) => result.ok && result.tool === "propose_vlan_plan");
+          const parsedPlan = VlanPlanSchema.safeParse(proposal?.output);
+          if (parsedPlan.success) { setPlan(parsedPlan.data); void cache.invalidateQueries({ queryKey: ["vlan-plans"] }); }
           addMessage({
             id: crypto.randomUUID(),
             role: "assistant",
@@ -58,6 +66,7 @@ export function ChatView() {
           });
         },
         onError: (err) => {
+          if (!isSessionCurrent()) return;
           addMessage({
             id: crypto.randomUUID(),
             role: "assistant",
@@ -72,9 +81,24 @@ export function ChatView() {
   return (
     <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
       <div className="flex flex-col gap-3">
+        <div className="flex gap-2">
+          <select aria-label="Conversación" value={conversation?.id ?? ""}
+            disabled={loading || chat.isPending} onChange={(e) => void selectConversation(e.target.value)}
+            className="min-w-0 flex-1 rounded border p-2 dark:bg-slate-900">
+            <option value="" disabled>Seleccionar conversación</option>
+            {conversations.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
+          </select>
+          <Button disabled={loading || chat.isPending} onClick={() => void newConversation()}>Nueva conversación</Button>
+        </div>
+        {error && <p role="alert">{error}</p>}
+        {loading && <p role="status">Cargando conversación…</p>}
+        {conversation?.pending && <p role="status">Hay una respuesta pendiente. Recarga la conversación; si el servidor se reinició, crea una nueva.</p>}
+        {conversation && <Button variant="ghost" disabled={loading || chat.isPending} onClick={() => void selectConversation(conversation.id)}>Recargar conversación</Button>}
+        {conversation?.nextBefore != null && <Button disabled={loading || chat.isPending} onClick={() => void loadOlder()}>Cargar mensajes anteriores</Button>}
+
         {messages.length > 0 && (
           <div className="flex justify-end">
-            <Button size="sm" variant="ghost" onClick={clearMessages} title="Borrar conversación">
+            <Button size="sm" variant="ghost" disabled={loading || chat.isPending} onClick={() => void clearMessages()} title="Borrar conversación">
               <Trash2 className="h-3.5 w-3.5" /> Borrar conversación
             </Button>
           </div>
@@ -107,7 +131,7 @@ export function ChatView() {
             placeholder="Preguntale algo a NetBot…"
             className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
           />
-          <Button type="submit" disabled={chat.isPending || !input.trim()}>
+          <Button type="submit" disabled={loading || chat.isPending || !conversation || conversation.pending || !input.trim()}>
             <Send className="h-4 w-4" />
           </Button>
         </form>
@@ -136,8 +160,18 @@ export function ChatView() {
           </div>
         )}
 
+        {role !== "VISUALIZADOR" && <div className="space-y-2">
+          <label htmlFor="saved-network-plan" className="text-sm">Retomar un plan de red</label>
+          <select id="saved-network-plan" value={plan?.id ?? ""} className="w-full rounded border p-2 dark:bg-slate-900"
+            onChange={(event) => { setCsvResult(null); setPlan(savedPlans.data?.find((row) => row.id === event.target.value) ?? null); }}>
+            <option value="">Seleccionar propuesta guardada</option>
+            {savedPlans.data?.map((row) => <option key={row.id} value={row.id}>{new Date(row.creadoEn).toLocaleString()} · {row.items.length} filas</option>)}
+          </select>
+          {savedPlans.error && <p role="alert">{savedPlans.error.message}</p>}
+        </div>}
         {plan && (
           <PlanDiffCard
+            key={plan.id}
             plan={plan}
             onDismiss={() => {
               setPlan(null);

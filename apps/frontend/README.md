@@ -48,3 +48,35 @@ por rol) y los estados de carga/error/vacío de `NetworkView`.
 QR real para enrolar 2FA (queda como texto/URI para cargar a mano),
 gestión de usuarios/roles desde Admin, y vista de topología de red (solo
 tabular por ahora).
+
+## Privacidad del chat y cambios de sesión
+
+El chat recupera conversaciones privadas desde el backend, permite crear,
+seleccionar, recargar y borrar conversaciones, y cargar mensajes anteriores.
+Ya no almacena ni reenvía historial desde `localStorage`; elimina la clave antigua
+sin importarla. El backend debe tener aplicada la migración de conversaciones.
+
+Al iniciar/cerrar sesión o cambiar la identidad/rol durante una renovación, se
+limpia la caché de consultas y se desmontan las vistas privadas. El cliente REST
+rechaza respuestas tardías de otra sesión y evita reintentarlas con credenciales
+nuevas. El refresh y el enrolamiento 2FA también descartan respuestas anteriores.
+
+Las pruebas cubren recuperación/borrado del chat, respuestas tardías, limpieza de
+caché y refresh después de logout. En Node 26, ejecutar las pruebas con
+`NODE_OPTIONS=--no-experimental-webstorage pnpm test` para que jsdom proporcione
+`localStorage` en lugar de la implementación experimental de Node.
+
+
+## Revisión y aprobación de red
+
+El chat/CSV propone; la tarjeta permite reservar y abrir un diálogo para revisar
+cada fila antes de confirmar. La solicitud incluye versión y huella del plan.
+La interfaz distingue encolado de aplicado/verificado, consulta el estado del worker
+mientras hay actividad, muestra errores y permite liberar reservas que aún no
+escriben o que están bloqueadas. Una reserva incierta requiere revisión técnica.
+
+El selector permite retomar las 20 propuestas propias más recientes tras recargar,
+incluidas las creadas por herramientas del chat. Los planes duran 30 minutos y
+las aprobaciones hasta 10 minutos. Los planes simulados se identifican expresamente.
+Actualizar también backend y workers: los contratos antiguos de reserva/aplicación
+sin versión/huella/confirmación ya no se aceptan.

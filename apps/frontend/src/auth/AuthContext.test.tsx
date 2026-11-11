@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, waitFor, act } from "@testing-library/react";
+import { queryClient } from "../lib/queryClient.js";
 import * as authApi from "../lib/authApi.js";
 import { AuthProvider, useAuth } from "./AuthContext.js";
 
@@ -67,4 +68,27 @@ describe("AuthContext — refresh deduplicado", () => {
     await expect(second).resolves.toBe("second-token");
     expect(refreshSpy).toHaveBeenCalledTimes(2);
   });
+});
+
+it("un refresh tardío no restaura la sesión después de logout y limpia datos privados", async () => {
+  const pending = deferred<Awaited<ReturnType<typeof authApi.refresh>>>();
+  vi.spyOn(authApi, "refresh").mockReturnValue(pending.promise);
+  vi.spyOn(authApi, "logout").mockResolvedValue({ status: "ok" });
+  localStorage.setItem("atlas-chat-messages", "private history");
+  queryClient.setQueryData(["private-tickets"], ["old-account"]);
+  let logout!: () => Promise<void>;
+  function SessionProbe() {
+    const auth = useAuth();
+    logout = auth.logout;
+    return <span>late-status:{auth.status}</span>;
+  }
+  render(<AuthProvider><SessionProbe /></AuthProvider>);
+  await act(async () => { await logout(); });
+  expect(localStorage.getItem("atlas-chat-messages")).toBeNull();
+  expect(queryClient.getQueryData(["private-tickets"])).toBeUndefined();
+  await act(async () => {
+    pending.resolve({ status: "ok", accessToken: "old", user: { id: "old", email: "old@test.local", role: "ADMIN", totpEnabled: true } });
+    await pending.promise;
+  });
+  expect(screen.getByText("late-status:unauthenticated")).toBeInTheDocument();
 });

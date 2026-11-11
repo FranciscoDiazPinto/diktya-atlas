@@ -24,10 +24,6 @@ export const toolDescriptions: Record<ToolName, string> = {
     "Lista lo que queda pendiente ahora mismo: tickets sin resolver y alertas que todavía no generaron ticket, opcionalmente filtrado por sitio/severidad. Usar para '¿qué hay pendiente?' al arrancar un turno.",
   propose_vlan_plan:
     "A partir de filas de CSV (nombre_red, vlan_id, ssid, banda, sitio), genera un plan de cambios (diff) contra el estado actual. NO escribe nada todavía.",
-  reserve_vlan:
-    "Reserva una VLAN de un plan ya propuesto. Falla con 409 si esa VLAN+sitio ya tiene una reserva activa.",
-  apply_vlan_plan:
-    "Aplica una reserva de VLAN ya confirmada por el usuario. Encola el trabajo real en worker-remediation; nunca escribe directo.",
   create_ticket: "Crea un ticket de incidencia con severidad, descripción y nodo/reserva asociados.",
   escalate_ticket: "Escala un ticket existente (ej. a un admin) indicando el motivo.",
   assign_ticket: "Asigna un ticket a un usuario (ADMIN o TECNICO) para dejar trazabilidad de quién se está haciendo cargo.",

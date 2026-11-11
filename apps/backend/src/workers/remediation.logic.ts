@@ -1,158 +1,99 @@
-import type { VlanPlan, WifiNetwork } from "@diktya-atlas/shared";
 import { prisma } from "../db/client.js";
+import type { ChangeExecutionStatus } from "@prisma/client";
 import type { RemediationJobData } from "./queues.js";
 import { getUnifiClient } from "../integrations/unifi/index.js";
 import { AutomatedWifiWriteNotSupportedError } from "../integrations/unifi/client.js";
 import { withWriteLock, LockAcquisitionError } from "../services/lock.service.js";
 import { verifyWriteAndRollbackIfNeeded } from "../services/writeVerification.service.js";
-import { markApplied } from "../services/vlanReservation.service.js";
+import { getApprovedExecution } from "../services/vlanFlow.service.js";
 import { createTicket } from "../services/ticket.service.js";
 import { recordAudit } from "../services/audit.service.js";
 import { publishRealtimeEvent } from "../realtime/hub.js";
+import { HttpError } from "../lib/errors.js";
 
-/**
- * El único lugar del sistema que escribe de verdad en UniFi/OPNsense.
- * Flujo obligatorio para CUALQUIER escritura, sin importar si la originó
- * el chat o una remediación automática:
- *   1. lock distribuido sobre write-lock:{sitio}:{vlanId}
- *   2. releer estado remoto y comparar contra el baseline conocido al
- *      reservar -> si difiere, alguien más ya escribió: abortar
- *   3. escribir
- *   4. releer y comparar campo a campo -> si no coincide, rollback
- *      automático; si el rollback también falla, ticket CRÍTICO
- *
- * Separado de worker-remediation.ts (que solo registra esto en un Worker
- * de BullMQ) para poder invocarlo directo en tests, sin depender del
- * timing async de una cola real.
- */
+/** La cola transporta IDs; actor y configuración se reconstruyen de la aprobación durable. */
 export async function processRemediation(data: RemediationJobData): Promise<void> {
   const reservation = await prisma.vlanReservation.findUnique({ where: { id: data.reservationId } });
-  if (!reservation) {
-    console.warn(`[worker-remediation] reserva ${data.reservationId} no encontrada`);
+  if (!reservation) return;
+  if (!data.approvalId || reservation.approvalId !== data.approvalId) {
+    await recordAudit({ workerName: "worker-remediation", toolName: "execute_vlan_approval", parametros: { reservationId: data.reservationId },
+      resultado: { abortado: true, motivo: "sin_aprobacion_valida" }, exitoso: false });
     return;
   }
-  if (reservation.estado !== "RESERVADA") {
-    // Idempotencia: si el job se reintenta después de haber aplicado (o
-    // liberado) la reserva, no repetir la escritura.
-    console.log(`[worker-remediation] reserva ${data.reservationId} ya está en estado ${reservation.estado}, no-op`);
-    return;
-  }
-
-  const plan = reservation.planSnapshot as unknown as VlanPlan;
-  const planItem = plan.items.find(
-    (item) => item.sitio === data.sitio && item.redPropuesta.ssid === data.ssid
-  );
-  const baseline = planItem?.redActual ?? null;
-
-  const client = getUnifiClient();
-
+  // No repetir una escritura tomada, finalizada o con resultado incierto.
+  if (reservation.estado !== "RESERVADA" || !["APPROVED", "QUEUED"].includes(reservation.executionStatus ?? "")) return;
+  let writeAttempted = false;
+  const setStatus = (status: ChangeExecutionStatus) => prisma.vlanReservation.updateMany({
+    where: { id: data.reservationId, approvalId: data.approvalId, executionStatus: { in: writeAttempted ? ["EXECUTING"] : ["APPROVED", "QUEUED"] } }, data: { executionStatus: status },
+  });
+  const audit = (exitoso: boolean, resultado: Record<string, unknown>) => recordAudit({
+    actorId: reservation.approvedById ?? undefined, workerName: "worker-remediation", toolName: "execute_vlan_approval",
+    parametros: { reservationId: data.reservationId, approvalId: data.approvalId, planId: reservation.changePlanId,
+      version: reservation.approvedPlanVersion, fingerprint: reservation.approvedFingerprint }, resultado, exitoso,
+  });
   try {
-    await withWriteLock(data.sitio, data.vlanId, async () => {
-      const currentRemote = await client.getWifiNetwork(data.sitio, data.ssid);
-
-      const baselineMatches = baseline
-        ? currentRemote !== null && currentRemote.vlanId === baseline.vlanId
-        : currentRemote === null;
-
+    const initial = await getApprovedExecution(data.reservationId, data.approvalId);
+    const client = getUnifiClient();
+    await withWriteLock(initial.input.sitio, initial.input.vlanId, async () => {
+      const execution = await getApprovedExecution(data.reservationId, data.approvalId);
+      const input = execution.input;
+      const currentRemote = await client.getWifiNetwork(input.sitio, input.ssid);
+      const baseline = execution.item.redActual;
+      const baselineMatches = baseline ? currentRemote !== null && currentRemote.vlanId === baseline.vlanId : currentRemote === null;
       if (!baselineMatches) {
-        const ticket = await createTicket({
-          titulo: `Doble escritura detectada en VLAN ${data.vlanId} en ${data.sitio}`,
-          descripcion: `El estado remoto de "${data.ssid}" cambió entre la propuesta del plan y la aplicación. Se abortó la escritura para evitar sobrescribir un cambio concurrente.`,
-          severidad: "ADVERTENCIA",
-          vlanReservationId: reservation.id,
-        });
+        await setStatus("BLOCKED");
+        const ticket = await createTicket({ titulo: `Cambio concurrente en VLAN ${input.vlanId} en ${input.sitio}`,
+          descripcion: `El estado remoto de "${input.ssid}" cambió desde la propuesta. Se requiere revisar y aprobar otro plan.`,
+          severidad: "ADVERTENCIA", vlanReservationId: reservation.id });
         await publishRealtimeEvent({ type: "ticket_updated", payload: ticket });
-        await recordAudit({
-          workerName: "worker-remediation",
-          toolName: "apply_vlan_plan",
-          parametros: data,
-          resultado: { abortado: true, motivo: "doble_escritura", ticketId: ticket.id },
-          exitoso: false,
-        });
+        await audit(false, { abortado: true, motivo: "doble_escritura", ticketId: ticket.id });
         return;
       }
-
-      let written: WifiNetwork;
+      // La lectura remota puede tardar: comprobar otra vez identidad, plan y vigencia.
+      await getApprovedExecution(data.reservationId, data.approvalId);
+      const claimed = await prisma.vlanReservation.updateMany({ where: {
+        id: data.reservationId, approvalId: data.approvalId, estado: "RESERVADA", approvedBy: { role: execution.ctx.role }, executionStatus: { in: ["APPROVED", "QUEUED"] }, approvalExpiresAt: { gt: new Date() },
+      }, data: { executionStatus: "EXECUTING" } });
+      if (!claimed.count) return;
+      writeAttempted = true;
       try {
-        written = await client.writeWifiNetwork({
-          sitio: data.sitio,
-          ssid: data.ssid,
-          vlanId: data.vlanId,
-          bandas: data.bandas,
-        });
+        await client.writeWifiNetwork(input);
       } catch (err) {
         if (!(err instanceof AutomatedWifiWriteNotSupportedError)) throw err;
-        const ticket = await createTicket({
-          titulo: `Requiere creación manual: "${data.ssid}" en ${data.sitio}`,
-          descripcion: `${err.message} No es un fallo transitorio — no se reintentará automáticamente.`,
-          severidad: "ADVERTENCIA",
-          vlanReservationId: reservation.id,
-        });
+        await setStatus("BLOCKED");
+        const ticket = await createTicket({ titulo: `Requiere creación manual: "${input.ssid}" en ${input.sitio}`,
+          descripcion: "El proveedor no admite esta escritura automática. No se reintentará esta aprobación.",
+          severidad: "ADVERTENCIA", vlanReservationId: reservation.id });
         await publishRealtimeEvent({ type: "ticket_updated", payload: ticket });
-        await recordAudit({
-          workerName: "worker-remediation",
-          toolName: "apply_vlan_plan",
-          parametros: data,
-          resultado: { abortado: true, motivo: "requiere_creacion_manual", detalle: err.message, ticketId: ticket.id },
-          exitoso: false,
-        });
+        await audit(false, { abortado: true, motivo: "requiere_creacion_manual", ticketId: ticket.id });
         return;
       }
-
-      const verification = await verifyWriteAndRollbackIfNeeded({
-        client,
-        input: { sitio: data.sitio, ssid: data.ssid, vlanId: data.vlanId, bandas: data.bandas },
-        previous: currentRemote,
-      });
-
+      const verification = await verifyWriteAndRollbackIfNeeded({ client, input, previous: currentRemote });
       if (verification.verified) {
-        await markApplied(reservation.id);
-        await publishRealtimeEvent({
-          type: "vlan_reservation_updated",
-          payload: { id: reservation.id, estado: "APLICADA" },
-        });
-        await recordAudit({
-          workerName: "worker-remediation",
-          toolName: "apply_vlan_plan",
-          parametros: data,
-          resultado: { escrito: written },
-          exitoso: true,
-        });
+        await prisma.$transaction([
+          prisma.vlanReservation.update({ where: { id: reservation.id }, data: { estado: "APLICADA", executionStatus: "APPLIED" } }),
+          prisma.auditLog.create({ data: { actorId: reservation.approvedById, workerName: "worker-remediation", toolName: "execute_vlan_approval",
+            parametros: { reservationId: reservation.id, approvalId: data.approvalId, fingerprint: reservation.approvedFingerprint },
+            resultado: { estado: "APPLIED", verified: true }, exitoso: true } }),
+        ]);
+        await publishRealtimeEvent({ type: "vlan_reservation_updated", payload: { id: reservation.id, estado: "APLICADA", executionStatus: "APPLIED" } });
         return;
       }
-
       const rollbackFailed = !verification.rollback?.succeeded;
-      const ticket = await createTicket({
-        titulo: rollbackFailed
-          ? `CRÍTICO: verificación post-escritura falló y el rollback también falló (VLAN ${data.vlanId}, ${data.sitio})`
-          : `Verificación post-escritura falló para VLAN ${data.vlanId} en ${data.sitio} (rollback exitoso)`,
-        descripcion: `Se escribió "${data.ssid}" -> VLAN ${data.vlanId} pero la relectura no coincidió. Rollback: ${JSON.stringify(verification.rollback)}`,
-        severidad: rollbackFailed ? "CRITICO" : "ADVERTENCIA",
-        vlanReservationId: reservation.id,
-      });
+      await setStatus(rollbackFailed ? "UNCERTAIN" : "FAILED");
+      const ticket = await createTicket({ titulo: rollbackFailed
+        ? `CRÍTICO: verificación y rollback fallidos (VLAN ${input.vlanId}, ${input.sitio})`
+        : `Verificación fallida con rollback exitoso (VLAN ${input.vlanId}, ${input.sitio})`,
+        descripcion: `No se verificó "${input.ssid}". La aprobación no se reintentará automáticamente.`,
+        severidad: rollbackFailed ? "CRITICO" : "ADVERTENCIA", vlanReservationId: reservation.id });
       await publishRealtimeEvent({ type: "ticket_updated", payload: ticket });
-      await recordAudit({
-        workerName: "worker-remediation",
-        toolName: "apply_vlan_plan",
-        parametros: data,
-        resultado: { verified: false, rollback: verification.rollback, ticketId: ticket.id },
-        exitoso: false,
-      });
+      await audit(false, { verified: false, rollback: verification.rollback, ticketId: ticket.id });
     });
   } catch (err) {
-    if (err instanceof LockAcquisitionError) {
-      // Otro proceso tiene el lock: no es un fallo del plan en sí, BullMQ
-      // reintentará el job con backoff (ver attempts/backoff al encolar).
-      console.warn(`[worker-remediation] ${err.message}, se reintentará`);
-      throw err;
-    }
-    await recordAudit({
-      workerName: "worker-remediation",
-      toolName: "apply_vlan_plan",
-      parametros: data,
-      resultado: { error: err instanceof Error ? err.message : String(err) },
-      exitoso: false,
-    });
-    throw err;
+    if (err instanceof LockAcquisitionError) throw err;
+    if (writeAttempted) await setStatus("UNCERTAIN");
+    else if (err instanceof HttpError) await setStatus("BLOCKED");
+    await audit(false, { abortado: true, motivo: writeAttempted ? "resultado_incierto" : err instanceof HttpError ? "aprobacion_no_vigente" : "fallo_previo_a_escritura" });
+    if (!(err instanceof HttpError)) throw err;
   }
 }
