@@ -26,6 +26,7 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  networkSites NetworkSiteAssignment[]
   changePlans NetworkChangePlan[]
   changeApprovals VlanReservation[] @relation("ChangeApprover")
   conversations Conversation[]
@@ -35,6 +36,15 @@ model User {
   auditLogs      AuditLog[]
 
   @@map("users")
+}
+
+model NetworkSiteAssignment {
+  userId String
+  sitio  String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, sitio])
+  @@map("network_site_assignments")
 }
 
 // Sesiones de refresh token. La emisión/rotación real de JWT la implementa

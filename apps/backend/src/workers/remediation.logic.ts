@@ -5,6 +5,7 @@ import { getUnifiClient } from "../integrations/unifi/index.js";
 import { AutomatedWifiWriteNotSupportedError } from "../integrations/unifi/client.js";
 import { withWriteLock, LockAcquisitionError } from "../services/lock.service.js";
 import { verifyWriteAndRollbackIfNeeded } from "../services/writeVerification.service.js";
+import { networkChangeActorFilter } from "../services/planDiff.service.js";
 import { getApprovedExecution } from "../services/vlanFlow.service.js";
 import { createTicket } from "../services/ticket.service.js";
 import { recordAudit } from "../services/audit.service.js";
@@ -52,7 +53,7 @@ export async function processRemediation(data: RemediationJobData): Promise<void
       // La lectura remota puede tardar: comprobar otra vez identidad, plan y vigencia.
       await getApprovedExecution(data.reservationId, data.approvalId);
       const claimed = await prisma.vlanReservation.updateMany({ where: {
-        id: data.reservationId, approvalId: data.approvalId, estado: "RESERVADA", approvedBy: { role: execution.ctx.role }, executionStatus: { in: ["APPROVED", "QUEUED"] }, approvalExpiresAt: { gt: new Date() },
+        id: data.reservationId, approvalId: data.approvalId, estado: "RESERVADA", approvedBy: networkChangeActorFilter(execution.ctx.role, [input.sitio]), executionStatus: { in: ["APPROVED", "QUEUED"] }, approvalExpiresAt: { gt: new Date() },
       }, data: { executionStatus: "EXECUTING" } });
       if (!claimed.count) return;
       writeAttempted = true;

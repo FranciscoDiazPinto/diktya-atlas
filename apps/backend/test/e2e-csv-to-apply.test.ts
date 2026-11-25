@@ -22,6 +22,7 @@ describe("flujo e2e: CSV -> plan -> reserva -> aplicar", () => {
   const ctx = { userId: "dev-tecnico", role: "TECNICO" } as const;
 
   afterAll(async () => {
+    await prisma.networkSiteAssignment.deleteMany({ where: { userId: ctx.userId, sitio } });
     await prisma.vlanReservation.deleteMany({ where: { id: { in: reservationIds } } });
     await prisma.ticket.deleteMany({ where: { vlanReservationId: { in: reservationIds } } });
     await prisma.networkChangePlan.deleteMany({ where: { id: { in: planIds } } });
@@ -50,6 +51,7 @@ describe("flujo e2e: CSV -> plan -> reserva -> aplicar", () => {
     const client = getUnifiClient();
 
     // Estado inicial: no existe la red todavía -> el diff debe proponer "crear".
+    await prisma.networkSiteAssignment.create({ data: { userId: ctx.userId, sitio } });
     const plan = await generateVlanPlan(filas, client, ctx);
     planIds.push(plan.id);
     expect(plan.items).toHaveLength(1);

@@ -31,7 +31,9 @@ const client = getUnifiClient();
 const headers = (ctx: RequestContext) => ({ authorization: `Bearer ${signAccessToken({ sub: ctx.userId, role: ctx.role })}` });
 const post = (path: string, ctx: RequestContext, payload: unknown) => app.inject({ method: "POST", url: path, headers: headers(ctx), payload });
 async function proposal() {
-  return generateVlanPlan([{ nombre_red: "Test", ssid: "Test", vlan_id: 88, banda: "5GHz", sitio: `approval-${randomUUID()}` }], client, owner);
+  const sitio = `approval-${randomUUID()}`;
+  await prisma.networkSiteAssignment.create({ data: { userId: owner.userId, sitio } });
+  return generateVlanPlan([{ nombre_red: "Test", ssid: "Test", vlan_id: 88, banda: "5GHz", sitio }], client, owner);
 }
 async function reserved() {
   const plan = await proposal();
@@ -206,8 +208,30 @@ describe("aprobación explícita del plan exacto", () => {
     expect((await release(secondId)).statusCode).toBe(200);
     expect(await prisma.vlanReservation.count({ where: { changePlanId: plan.id, estado: "LIBERADA" } })).toBe(2);
   });
+  it("rechaza sitios sin asignación antes de consultar UniFi", async () => {
+    const read = vi.spyOn(client, "getWifiNetwork");
+    await expect(generateVlanPlan([
+      { nombre_red: "Test", ssid: "Test", vlan_id: 88, banda: "5GHz", sitio: `unassigned-${randomUUID()}` },
+    ], client, owner)).rejects.toMatchObject({ statusCode: 403 });
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it("bloquea un trabajo encolado si el técnico pierde el sitio", async () => {
+    const { plan, reservationId } = await reserved();
+    const response = await approve(plan, reservationId);
+    expect(response.statusCode).toBe(202);
+    await prisma.networkSiteAssignment.deleteMany({ where: { userId: owner.userId, sitio: plan.items[0]!.sitio } });
+    const write = vi.spyOn(client, "writeWifiNetwork");
+
+    await processRemediation({ reservationId, approvalId: response.json().approvalId });
+
+    expect(write).not.toHaveBeenCalled();
+    expect((await prisma.vlanReservation.findUniqueOrThrow({ where: { id: reservationId } })).executionStatus).toBe("BLOCKED");
+  });
+
   it("conserva aplicaciones históricas de la misma VLAN sin bloquear cambios nuevos", async () => {
     const site = `history-${randomUUID()}`;
+    await prisma.networkSiteAssignment.create({ data: { userId: owner.userId, sitio: site } });
     for (const vlan of [88, 99, 88]) {
       const plan = await generateVlanPlan([{ nombre_red: "History", ssid: "History", vlan_id: vlan, banda: "5GHz", sitio: site }], client, owner);
       const result = await post("/vlan/reserve", owner, { planId: plan.id, version: plan.version, fingerprint: plan.fingerprint });

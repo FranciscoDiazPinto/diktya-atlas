@@ -10,11 +10,27 @@ import { HttpError, NotFoundError } from "../lib/errors.js";
 export const PLAN_TTL_MS = 30 * 60_000;
 export const APPROVAL_TTL_MS = 10 * 60_000;
 
-export async function authorizeNetworkChange(ctx: RequestContext) {
-  const user = await prisma.user.findUnique({ where: { id: ctx.userId } });
-  if (!user || user.role !== ctx.role || !["ADMIN", "TECNICO"].includes(user.role)) {
-    throw new HttpError(403, "Tu cuenta no está autorizada para cambios de red. Inicia sesión nuevamente.");
+export function networkChangeActorFilter(role: RequestContext["role"], sites: readonly string[] = []): Prisma.UserWhereInput {
+  if (role !== "TECNICO") return { role };
+  return {
+    role,
+    AND: [...new Set(sites)].map((sitio) => ({ networkSites: { some: { sitio } } })),
+  };
+}
+
+export async function authorizeNetworkChange(
+  ctx: RequestContext,
+  sites: readonly string[] = [],
+  db: Pick<Prisma.TransactionClient, "user"> = prisma,
+) {
+  if (ctx.role === "ADMIN" || ctx.role === "TECNICO") {
+    const user = await db.user.findFirst({
+      where: { id: ctx.userId, ...networkChangeActorFilter(ctx.role, sites) },
+      select: { id: true },
+    });
+    if (user) return;
   }
+  throw new HttpError(403, "Tu cuenta no está autorizada para este cambio de red o para los sitios solicitados.");
 }
 
 // JSONB puede cambiar el orden de las claves: el hash usa una representación canónica.
@@ -57,8 +73,9 @@ export function bandasFromCsvBanda(banda: CsvRow["banda"]): Array<"2.4GHz" | "5G
 
 /** Propone y persiste; no reserva ni escribe infraestructura. */
 export async function generateVlanPlan(rows: CsvRow[], client: UnifiClient, ctx: RequestContext): Promise<VlanPlan> {
-  await authorizeNetworkChange(ctx);
   const validatedRows = CsvRowSchema.array().min(1).max(500).parse(rows);
+  const sites = validatedRows.map((row) => row.sitio);
+  await authorizeNetworkChange(ctx, sites);
   const items: VlanPlanItem[] = [];
   const resources = new Set<string>();
   for (const row of validatedRows) {
@@ -73,13 +90,11 @@ export async function generateVlanPlan(rows: CsvRow[], client: UnifiClient, ctx:
       accion: !actual ? "crear" : actual.vlanId === row.vlan_id ? "sin_cambios" : "modificar",
     });
   }
-  await authorizeNetworkChange(ctx);
   const now = new Date();
   const proposal = { id: randomUUID(), version: 1, source: env.UNIFI_MODE, targetFingerprint: currentTargetFingerprint(), items, creadoEn: now.toISOString(), expiresAt: new Date(now.getTime() + PLAN_TTL_MS).toISOString() };
   const plan: VlanPlan = { ...proposal, fingerprint: planFingerprint(proposal) };
   await prisma.$transaction(async (tx) => {
-    const user = await tx.user.findUnique({ where: { id: ctx.userId } });
-    if (!user || user.role !== ctx.role) throw new HttpError(403, "Tu acceso cambió durante la consulta.");
+    await authorizeNetworkChange(ctx, sites, tx);
     await tx.networkChangePlan.create({ data: {
       id: plan.id, ownerId: ctx.userId, ownerRole: ctx.role, version: plan.version,
       fingerprint: plan.fingerprint, payload: plan as unknown as Prisma.InputJsonValue,

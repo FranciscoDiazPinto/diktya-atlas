@@ -8,7 +8,7 @@ atención; las implementaciones se adaptan a los contratos propios de Atlas.
 | 1 | Limpiar historial/caché entre cuentas y descartar respuestas tardías | Implementada localmente |
 | 2 | Conversaciones privadas en servidor, recuperación, eliminación y control de concurrencia | Implementada localmente |
 | 3 | Propuestas persistidas, aprobación explícita vinculada al actor/versión y vencimiento; retirar ejecución del LLM | Implementada localmente para cambios de red |
-| 4 | Asignaciones por sitio/evento, autorización en servicios/workers y WebSocket autenticado con eventos filtrados | Pendiente |
+| 4 | Asignaciones por sitio/evento, autorización en servicios/workers y WebSocket autenticado con eventos filtrados | Parcial: autorización por sitio para VLAN |
 | 5 | Idempotencia y seguimiento por operación, estados parciales/inciertos y conciliación sin reintentos ambiguos | Pendiente |
 | 6 | Login con Google Workspace restringido, administración de usuarios/roles, revocación y auditoría consultable/exportable sin secretos | Pendiente |
 | 7 | Contratos específicos UniFi/OPNsense, timeouts, errores tipados y antigüedad/origen de datos | Pendiente |
@@ -145,8 +145,27 @@ hay escritura en curso ni resultado incierto. Se preserva el historial mediante
 un índice único parcial de reservas activas. API y README detallan los contratos,
 las dos migraciones y la actualización conjunta de servidor, frontend y workers.
 
-Esta entrega no completa las etapas 4–5: quedan autorización por sitio/evento,
-WebSocket, conciliación automática de ejecuciones interrumpidas, outbox/reencolado
-autónomo y validación real de integraciones. Fallos ambiguos no se reintentan;
+Las etapas 4–5 incluyen autorización por sitio y evento, WebSocket,
+conciliación automática de ejecuciones interrumpidas, outbox/reencolado autónomo
+y validación real de integraciones. Fallos ambiguos no se reintentan;
 aprobaciones guardadas cuyo encolado falló se recuperan mediante reintento explícito.
 Las pruebas usan base temporal y adaptadores simulados, sin operar equipos reales.
+
+### Autorización por sitio para VLAN
+
+La migración `20261125120000_network_site_assignments` crea la tabla
+`network_site_assignments`. Antes de activar esta versión, aprovisionar una fila
+`(userId, sitio)` por sitio autorizado a cada técnico. El valor de `sitio` debe
+coincidir con el identificador del plan. Los administradores conservan acceso
+a todos los sitios. Un técnico sin asignaciones recibe 403 al proponer, reservar o
+aprobar cambios de VLAN.
+
+El worker vuelve a comprobar la asignación antes de ejecutar y al tomar la
+aprobación. El historial propio y la liberación de reservas siguen disponibles
+tras revocar un sitio. Las asignaciones por evento, la administración desde la
+aplicación y el filtrado de WebSocket siguen pendientes.
+
+Se verificó la migración en PostgreSQL temporal, el chequeo de tipos del backend
+y las 16 pruebas de aprobación, incluidas la denegación antes de consultar UniFi
+y la revocación de un trabajo en cola. Queda por ejecutar la prueba integral
+CSV → VLAN con Redis.

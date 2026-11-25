@@ -15,6 +15,7 @@ export interface ReserveItemResult {
 export async function reserveVlanPlanItems(planId: string, ctx: RequestContext, expected: PlanReference) {
   const plan = await getPlan(planId, ctx);
   requireCurrentPlan(plan, expected);
+  await authorizeNetworkChange(ctx, plan.items.map((item) => item.sitio));
   const results: ReserveItemResult[] = [];
   for (const item of plan.items) {
     if (item.accion === "sin_cambios") continue;
@@ -47,6 +48,7 @@ async function ownedReservedPlan(reservationId: string, ctx: RequestContext, exp
   validateStoredPlan({ ...plan, payload: reservation.planSnapshot, expiresAt: new Date(plan.expiresAt) });
   const item = plan.items.find((row) => row.sitio === reservation.sitio && row.redPropuesta.ssid === reservation.redSolicitada && row.redPropuesta.vlanId === reservation.vlanId);
   if (!item || item.accion === "sin_cambios") throw new HttpError(409, "La reserva no coincide con una fila modificable del plan.");
+  await authorizeNetworkChange(ctx, [item.sitio]);
   return { reservation, plan, item };
 }
 
@@ -60,8 +62,7 @@ export async function enqueueApplyVlanPlan(reservationId: string, ctx: RequestCo
     requireCurrentPlan(plan, expected);
     const approvalId = randomUUID();
     approval = await prisma.$transaction(async (tx) => {
-      const actor = await tx.user.findUnique({ where: { id: ctx.userId } });
-      if (!actor || actor.role !== ctx.role || !["ADMIN", "TECNICO"].includes(actor.role)) throw new HttpError(403, "Tu acceso cambió antes de confirmar.");
+      await authorizeNetworkChange(ctx, [reservation.sitio], tx);
       const claimed = await tx.vlanReservation.updateMany({
         where: { id: reservationId, reservadoPorId: ctx.userId, changePlanId: plan.id, estado: "RESERVADA", approvalId: null },
         data: { approvalId, approvedById: ctx.userId, approvedRole: ctx.role, approvedPlanVersion: plan.version,
