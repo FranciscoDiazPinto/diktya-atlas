@@ -1,6 +1,6 @@
 import type { NetworkNode, WifiNetwork, Alert } from "../../domain/network.js";
 import { AutomatedWifiWriteNotSupportedError } from "./client.js";
-import type { UnifiClient, WriteWifiNetworkInput } from "./client.js";
+import type { UnifiClient, WifiPreviewInventory, WriteWifiNetworkInput } from "./client.js";
 import {
   normalizeAlert,
   normalizeIntegrationWifiBroadcast,
@@ -220,6 +220,22 @@ export class UnifiLiveClient implements UnifiClient {
   async getNodeDetail(nodeId: string): Promise<NetworkNode | null> {
     const nodes = await this.listNodes();
     return nodes.find((n) => n.id === nodeId) ?? null;
+  }
+
+  async getWifiPreviewInventory(sitio: string): Promise<WifiPreviewInventory> {
+    const client = await this.getIntegrationClient();
+    const siteId = await client.resolveSiteId(sitio);
+    const [devices, networks, broadcasts] = await Promise.all([
+      client.listDevices(siteId),
+      client.listNetworks(siteId),
+      client.listWifiBroadcasts(siteId),
+    ]);
+    return {
+      accessPoints: devices.filter((device) => device.features.includes("accessPoint"))
+        .map(({ id, name }) => ({ id, name })),
+      networks: networks.map(({ id, vlanId }) => ({ id, vlanId })),
+      ssids: broadcasts.map(({ name }) => name),
+    };
   }
 
   async listWifiNetworks(sitio?: string): Promise<WifiNetwork[]> {

@@ -1,13 +1,12 @@
 import { env } from "../../config/env.js";
-import type { UnifiClient } from "./client.js";
 import { MockUnifiClient } from "./mockClient.js";
-import { createUnifiLiveClientFromEnv } from "./liveClient.js";
+import { createUnifiLiveClientFromEnv, type UnifiLiveClient } from "./liveClient.js";
 
 export type { UnifiClient, WriteWifiNetworkInput } from "./client.js";
 export { MockUnifiClient } from "./mockClient.js";
 export { UnifiLiveClient } from "./liveClient.js";
 
-let instance: UnifiClient | undefined;
+let instance: UnifiLiveClient | MockUnifiClient | undefined;
 
 /**
  * Datos de ejemplo solo para que la demo en navegador (frontend) tenga
@@ -52,7 +51,7 @@ function seedDemoData(client: MockUnifiClient): void {
   });
 }
 
-export function getUnifiClient(): UnifiClient {
+export function getUnifiClient() {
   if (!instance) {
     if (env.UNIFI_MODE === "live") {
       instance = createUnifiLiveClientFromEnv();

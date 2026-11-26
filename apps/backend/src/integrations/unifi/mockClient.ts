@@ -1,5 +1,5 @@
 import type { NetworkNode, WifiNetwork, Alert } from "../../domain/network.js";
-import type { UnifiClient, WriteWifiNetworkInput } from "./client.js";
+import type { UnifiClient, WifiPreviewInventory, WriteWifiNetworkInput } from "./client.js";
 
 /**
  * Cliente en memoria para desarrollo/tests sin credenciales reales.
@@ -49,6 +49,17 @@ export class MockUnifiClient implements UnifiClient {
 
   async getNodeDetail(nodeId: string): Promise<NetworkNode | null> {
     return this.nodes.get(nodeId) ?? null;
+  }
+
+  async getWifiPreviewInventory(sitio: string): Promise<WifiPreviewInventory> {
+    const [nodes, broadcasts] = await Promise.all([this.listNodes(sitio), this.listWifiNetworks(sitio)]);
+    return {
+      accessPoints: nodes.filter((node) => node.tipoDispositivo === "AP")
+        .map(({ id, nombre }) => ({ id, name: nombre })),
+      networks: [...new Set(broadcasts.map(({ vlanId }) => vlanId))]
+        .map((vlanId) => ({ id: `mock-vlan-${vlanId}`, vlanId })),
+      ssids: broadcasts.map(({ ssid }) => ssid),
+    };
   }
 
   async listWifiNetworks(sitio?: string): Promise<WifiNetwork[]> {

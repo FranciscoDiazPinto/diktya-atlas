@@ -12,7 +12,7 @@ atención; las implementaciones se adaptan a los contratos propios de Atlas.
 | 5 | Idempotencia y seguimiento por operación, estados parciales/inciertos y conciliación sin reintentos ambiguos | Pendiente |
 | 6 | Login con Google Workspace restringido, administración de usuarios/roles, revocación y auditoría consultable/exportable sin secretos | Pendiente |
 | 7 | Contratos específicos UniFi/OPNsense, timeouts, errores tipados y antigüedad/origen de datos | Pendiente |
-| 8 | Crear/modificar SSID, seleccionar AP y asociar VLAN existentes mediante planes aprobados | Pendiente |
+| 8 | Crear/modificar SSID, seleccionar AP y asociar VLAN existentes mediante planes aprobados | Parcial: API de vista previa para SSID nuevos |
 | 9 | Registro del ciclo de atención y reportes agregados de volumen, resultados y duración | Pendiente |
 
 ## Entregas y aceptación
@@ -26,13 +26,28 @@ atención; las implementaciones se adaptan a los contratos propios de Atlas.
 3. Operación administrable: etapa 6. Gestionar accesos y rastrear aprobación,
    ejecución y verificación desde la aplicación.
 4. Infraestructura: etapas 7–8. Distinguir fallas de proveedor de caídas reales;
-   validar escrituras en laboratorio con versión de controlador identificada.
+   usar UniFi Network `11.0.104` como versión objetivo del contrato de integración.
+   Validar en laboratorio con esa versión la creación y modificación de SSID, la
+   selección de AP y la asociación a VLAN existentes antes de habilitar escrituras.
 5. Reportes de atención: etapa 9, dependiente de la persistencia de conversaciones
    de la etapa 2 y de los permisos de consulta de la etapa 6. Contar solo atenciones
    efectivas y mostrar resultados agregados sin revelar conversaciones privadas.
 
 Cada entrega incluye migraciones, pruebas críticas y documentación. Atención a
 invitados, QR y recuperación por correo quedan para una ampliación posterior.
+
+## Vista previa de planes Wi-Fi · etapa 8
+
+`POST /network/wifi-plans/preview` acepta JSON con `sitio` (referencia interna
+de UniFi), `apIds` (identificadores de AP del sitio) y `filas` (objetos con
+`fila`, `ssid` y `vlanId`). Requiere un administrador o un técnico asignado al
+sitio. Devuelve el inventario seleccionado, la red resuelta y los errores de
+cada fila. `source` distingue `mock` de `live` y `contractVersion` indica la
+versión objetivo, sin detectar la versión instalada del controlador.
+
+La vista previa consulta inventario y valida candidatos en memoria. Quedan
+pendientes el importador XLSX, la pantalla, la edición de SSID existentes y la
+persistencia del plan para aprobación y ejecución posterior.
 
 ## Login con Google y administración · etapa 6
 

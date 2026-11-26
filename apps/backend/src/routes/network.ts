@@ -8,6 +8,10 @@ import {
   rebootNode,
 } from "../services/network.service.js";
 import { authenticate, requireRole } from "../auth/middleware.js";
+import { getUnifiClient } from "../integrations/unifi/index.js";
+import { env } from "../config/env.js";
+import { authorizeNetworkChange } from "../services/planDiff.service.js";
+import { previewWifiPlan, WifiPlanPreviewSchema } from "../services/wifiPlanPreview.service.js";
 import { routeDocs } from "../lib/openapi.js";
 
 const StatusQuerySchema = z.object({ sitio: z.string().optional() });
@@ -52,6 +56,27 @@ export async function networkRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       const { sitio } = StatusQuerySchema.parse(request.query);
       return reply.send(await getLiveWifiNetworks(sitio));
+    }
+  );
+
+  fastify.post(
+    "/network/wifi-plans/preview",
+    {
+      preHandler: requireRole("ADMIN", "TECNICO"),
+      attachValidation: true,
+      schema: routeDocs({
+        summary: "Simular la creación de SSID en AP seleccionados",
+        tags: ["Red"],
+        body: WifiPlanPreviewSchema,
+      }),
+    },
+    async (request, reply) => {
+      const input = WifiPlanPreviewSchema.parse(request.body);
+      const actor = request.authContext!;
+      await authorizeNetworkChange(actor, [input.sitio]);
+      const inventory = await getUnifiClient().getWifiPreviewInventory(input.sitio);
+      await authorizeNetworkChange(actor, [input.sitio]);
+      return reply.send({ source: env.UNIFI_MODE, ...previewWifiPlan(input, inventory) });
     }
   );
 

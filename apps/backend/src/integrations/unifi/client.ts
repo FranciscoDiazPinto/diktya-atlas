@@ -15,6 +15,12 @@ export class AutomatedWifiWriteNotSupportedError extends Error {
   }
 }
 
+export interface WifiPreviewInventory {
+  accessPoints: Array<{ id: string; name: string }>;
+  networks: Array<{ id: string; vlanId: number }>;
+  ssids: string[];
+}
+
 export interface WriteWifiNetworkInput {
   sitio: string;
   ssid: string;
